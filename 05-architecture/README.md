@@ -161,3 +161,48 @@ La fuente no contempla un desglose por vendedor.
 
 Existe una decisión pendiente sobre la agrupación por categoría histórica: si el nombre de una categoría cambia, el reporte puede generar filas diferentes para nombres históricos distintos. Esta decisión debe contrastarse con la especificación de reporte señalada en el modelo y confirmarse con el responsable del sistema.
 
+## 10. Fechas, moneda y configuración
+
+### 10.1. Fechas
+
+Las marcas de tiempo utilizan `timestamptz`, con UTC como referencia del servidor.
+
+### 10.2. Moneda
+
+El modelo no incorpora campos de moneda. La solución descrita es monomoneda.
+
+### 10.3. Inicialización
+
+La fuente indica que el usuario administrador inicial se crea al iniciar la aplicación mediante credenciales provenientes del entorno, no mediante una inserción SQL de inicialización.
+
+La forma exacta de desplegar, almacenar o rotar esas credenciales debe documentarse únicamente si está descrita en la fuente.
+
+## 11. Integridad, privacidad y conservación
+
+- El stock persistido no puede ser negativo.
+- Las ventas y sus líneas conservan información histórica de las operaciones.
+- Los productos se retiran mediante eliminación lógica con `deleted_at`.
+- Los hashes de contraseñas no deben exponerse en registros de aplicación.
+- No se deben introducir datos de clientes como parte de la arquitectura porque el modelo no define una entidad de cliente.
+- No se deben afirmar campos `created_at` o `updated_at`, ya que la fuente indica que no existen.
+
+## 12. Decisiones pendientes y deuda técnica
+
+| Elemento | Situación que debe verificarse |
+|---|---|
+| Precio positivo | La fuente presenta información contradictoria sobre su restricción física. |
+| Cantidad positiva | Confirmar el estado final de la restricción física. |
+| FK de `sale_item` a `product` | Verificar el estado final de T-20 y la definición física. |
+| FK de `sale` a `user` | Aparece como pendiente en la fuente mediante T-12. |
+| Agrupación de reportes por categoría | Existe una decisión pendiente sobre nombres históricos y renombrados. |
+| Transacciones y concurrencia | No especificar comportamiento que no esté confirmado en la fuente. |
+
+Los identificadores de tarea deben comprobarse directamente en `spec/data-model.md`. Esta tabla no afirma que las tareas estén resueltas.
+
+## 13. Fuente de referencia
+
+Toda la arquitectura documentada se deriva de `spec/data-model.md`, especialmente de las definiciones del modelo físico, las relaciones, las reglas del dominio, los reportes y las tareas pendientes.
+
+
+
+
