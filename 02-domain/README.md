@@ -1,192 +1,207 @@
-# 02 — Domain
+# 02 — Domain Model
 
-## 1. Propósito
+## 1. Purpose
 
-Este documento describe el dominio del sistema a partir de las entidades, relaciones y reglas presentes en `spec/data-model.md`.
+This document defines the business language, entities, invariants, and domain behavior identified in [`spec/data-model.md`](../spec/data-model.md).
 
-El dominio representa los conceptos del negocio y sus invariantes, sin confundirlos con las tablas físicas ni con las decisiones específicas de PostgreSQL.
+It describes the domain independently of any unconfirmed user interface, API, or deployment architecture.
 
-## 2. Lenguaje ubicuo
+## 2. Domain glossary
 
-| Término | Significado en el sistema |
-|---|---|
-| Category | Clasificación a la que pertenece un producto. |
-| Product | Producto del catálogo con nombre, precio, existencias y categoría. |
-| Sale | Registro de una venta realizada por un usuario interno. |
-| SaleItem | Línea que representa un producto y una cantidad dentro de una venta. |
-| User | Usuario interno que opera el sistema. |
-| Admin | Rol administrativo. |
-| Seller | Rol de vendedor u operador de ventas. |
-| Stock | Cantidad disponible registrada para un producto. |
-| Historical snapshot | Valores del producto conservados en la línea de venta en el momento de la operación. |
-| Soft delete | Retiro lógico de un producto mediante `deleted_at`, sin eliminar físicamente el registro. |
-| Subtotal | Importe calculado para una línea de venta. |
-| Total | Importe calculado a partir de las líneas de una venta. |
-
-## 3. Entidades del dominio
-
-### 3.1. Category
-
-Representa una categoría utilizada para clasificar productos.
-
-La fuente define cinco categorías iniciales:
-
-- General
-- Herramientas
-- Electricidad
-- Fontanería
-- Pinturas
-
-Las categorías se suministran mediante registros iniciales. El modelo no respalda una funcionalidad de creación, edición o eliminación de categorías; por tanto, no debe afirmarse que existe un CRUD de categorías.
-
-**Relación:** una categoría puede asociarse con varios productos mediante `product.category_id`.
-
-### 3.2. Product
-
-Representa un producto del catálogo.
-
-Sus datos relevantes incluyen:
-
-- Nombre.
-- Precio.
-- Stock.
-- Categoría.
-- Imagen opcional.
-- `deleted_at` para el retiro lógico del catálogo.
-
-El modelo no define atributos de descripción, SKU o referencia comercial. No deben agregarse como atributos existentes sin evidencia.
-
-Reglas identificadas:
-
-- El stock no puede ser negativo; existe una restricción `CHECK` en PostgreSQL identificada como `ck_product_stock_non_negative`.
-- La fuente describe la validación de precio positivo como una regla de dominio, pero contiene información contradictoria sobre el estado de su restricción en base de datos. Se debe verificar la sección de restricciones y las tareas pendientes antes de afirmar que también existe un `CHECK` físico.
-- El retiro de un producto es lógico, no una eliminación física habitual.
-
-### 3.3. Sale
-
-Representa una venta registrada.
-
-Incluye información de la operación, como la fecha, el usuario asociado y sus líneas de detalle.
-
-Reglas identificadas:
-
-- La venta es inmutable según el modelo.
-- No se describen puertos para editar o eliminar una venta existente.
-- `EnsureConfirmable` exige que la venta tenga al menos una línea antes de poder confirmarse.
-- La relación con el usuario se representa mediante `sold_by_user_id`, aunque la clave foránea correspondiente aparece como pendiente en la fuente.
-
-La inmutabilidad de una venta es una regla del dominio descrito; no implica que PostgreSQL tenga necesariamente una restricción física que impida toda actualización.
-
-### 3.4. SaleItem
-
-Representa una línea perteneciente a una venta.
-
-Relaciona una venta con un producto e incluye la cantidad y una copia de valores históricos del producto.
-
-Entre los valores conservados se encuentran:
-
-- Identificador de la venta.
-- Identificador del producto.
-- Cantidad.
-- Precio unitario histórico.
-- Nombre histórico del producto.
-- Categoría histórica del producto.
-
-Reglas identificadas:
-
-- La línea existe como parte de una venta.
-- El precio y el nombre se congelan en el momento de la operación.
-- La categoría histórica se conserva para mantener el contexto de la venta.
-- El subtotal se calcula; no se almacena como campo persistido.
-- La cantidad debe ser mayor que cero según la regla de dominio descrita.
-- La fuente identifica trabajo pendiente relacionado con la restricción física de cantidad; no se debe asumir que existe un `CHECK` en PostgreSQL sin verificar el estado actual.
-
-### 3.5. User
-
-Representa a un usuario interno del sistema.
-
-La información contempla credenciales representadas mediante `password_hash` y un rol.
-
-Roles identificados:
-
-- `admin`
-- `seller`
-
-El dominio no debe manejar contraseñas en texto plano. Los hashes no deben exponerse en registros de aplicación.
-
-El modelo no representa a un cliente comprador mediante esta entidad.
-## 4. Relaciones principales
-
-| Relación | Significado |
-|---|---|
-| Category → Product | Una categoría puede clasificar varios productos. |
-| Sale → SaleItem | Una venta contiene sus líneas de detalle. |
-| Product → SaleItem | Una línea hace referencia al producto asociado. |
-| User → Sale | Una venta se asocia con el usuario que la realiza mediante `sold_by_user_id`; la FK aparece pendiente en la fuente. |
-
-Las relaciones anteriores representan el significado de negocio. El estado exacto de cada clave foránea debe verificarse en la sección física del modelo de datos.
-
-## 5. Reglas de negocio
-
-| ID | Regla | Estado o evidencia |
+| Term | Definition | Source representation |
 |---|---|---|
-| DOM-01 | El stock de un producto no puede ser negativo. | Implementada en PostgreSQL mediante `ck_product_stock_non_negative`. |
-| DOM-02 | El precio del producto debe ser positivo. | Regla de dominio; estado físico contradictorio en la fuente, requiere verificación. |
-| DOM-03 | La cantidad de una línea debe ser mayor que cero. | Regla de dominio; restricción física pendiente o por verificar. |
-| DOM-04 | Una venta debe tener al menos una línea para ser confirmable. | Validada mediante `Sale.EnsureConfirmable`. |
-| DOM-05 | La venta es inmutable. | Regla del dominio; no se describen puertos de edición o eliminación. |
-| DOM-06 | La línea conserva el precio histórico del producto. | Regla de conservación de datos de la venta. |
-| DOM-07 | La línea conserva el nombre y la categoría históricos. | Regla de conservación de datos de la venta. |
-| DOM-08 | El subtotal y el total se calculan, no se persisten como campos. | Cálculo derivado de las líneas. |
-| DOM-09 | La retirada de un producto es lógica. | Se utiliza `deleted_at`. |
-| DOM-10 | Las contraseñas se representan mediante un hash. | El dominio no maneja contraseñas en texto plano. |
+| Product | An item in the catalog with a name, price, stock quantity, category, and optional image key. | `Product` / `product` |
+| Category | A classification assigned to products. The source defines five seeded categories without category maintenance operations. | `Category` / `category` |
+| Money | A value object representing a monetary amount. Its documented behavior includes rounding to two decimal places. | `Money` |
+| Stock | The available quantity of a product. Persisted stock must not be negative. | `product.stock` |
+| Sale | An immutable business record representing a completed sale. | `Sale` / `sale` |
+| Sale item | A line belonging to a sale, with a product, quantity, and historical values. | `SaleItem` / `sale_item` |
+| Quantity | A value object representing the quantity of items sold. The domain requires a positive value. | `Quantity` |
+| Line subtotal | The historical unit price multiplied by the line quantity. It is calculated rather than persisted. | `SaleItem.Subtotal` |
+| Sale total | The sum of the sale-line subtotals. It is calculated rather than persisted. | `Sale.Total` |
+| User | An internal operator associated with sales. | `User` / `user` |
+| Role | One of the two role values defined by the model: `admin` or `seller`. | `user.role` |
+| Password hash | The stored hash representation of a user's password. The domain must not handle the plaintext password. | `user.password_hash` |
+| Image key | An opaque reference to an image stored externally; it is not the image binary or a filesystem path. | `product.image_key` |
+| Logical deletion | Retiring a product through `deleted_at` without physically deleting its database row. | `product.deleted_at` |
+| Sales report | An aggregated read result computed from stored data rather than persisted as a separate entity. | Reporting model |
 
-Los identificadores DOM-01 a DOM-10 son identificadores documentales para esta reconstrucción; no se deben confundir con identificadores oficiales de la fuente.
+**Source reference:** `spec/data-model.md`, §1–§3 and the relevant reporting definitions.
 
-## 6. Ciclo de una venta
+## 3. Entities and responsibilities
 
-A partir de las reglas documentadas, el proceso de negocio puede resumirse así:
+### 3.1 Category
 
-1. Se identifica el producto que se venderá.
-2. Se determina la cantidad solicitada.
-3. La operación de agregar una línea retira stock antes de incorporar la línea, según el comportamiento descrito de `Sale.AddItem`.
-4. Se conserva en la línea el precio, nombre y categoría históricos del producto.
-5. Antes de confirmar la venta, `Sale.EnsureConfirmable` verifica que exista al menos una línea.
-6. El subtotal de cada línea y el total de la venta se calculan a partir de sus datos.
+`Category` classifies products.
 
-Este resumen representa las reglas descritas, no una especificación completa de transacciones, concurrencia o recuperación ante fallos. Esos detalles deben documentarse solo si la fuente los confirma.
+The model defines five seeded categories: General, Herramientas, Electricidad, Fontanería, and Pinturas.
 
-## 7. Invariantes y consistencia
+Category maintenance is not exposed through the documented domain ports. The repository is described as read-only for categories.
 
-Las siguientes condiciones deben mantenerse:
+The category name must be non-empty and trimmed by the domain. The source distinguishes this domain rule from the database's unique-name index.
 
-- El stock persistido no puede ser negativo.
-- Una venta confirmable debe contener líneas.
-- La cantidad de cada línea debe ser positiva según la regla de dominio.
-- El precio y los demás valores históricos conservados no deben cambiar simplemente porque se actualice el catálogo.
-- El total debe derivarse de las líneas y no depender de un total persistido que la fuente no contempla.
-- Una venta registrada no debe tratarse como una entidad editable si se mantiene la inmutabilidad definida.
+**Source reference:** `spec/data-model.md`, §2.1 and §9.
 
-## 8. Eventos del dominio
+### 3.2 Product
 
-La fuente describe entidades y operaciones, pero no permite confirmar un catálogo formal de eventos de dominio ni un mecanismo de publicación de eventos.
+`Product` is the aggregate root for catalog information.
 
-Por tanto, no se declara la existencia de eventos como `SaleConfirmed` o `StockReduced` como eventos implementados.
+Its documented data includes:
 
-Como posibles conceptos para una futura modelación, podrían evaluarse eventos relacionados con la confirmación de una venta y la modificación de existencias, pero su implementación debe marcarse como propuesta y no como hecho existente.
+- Name.
+- Price.
+- Stock.
+- Category.
+- Optional image key.
+- Logical-deletion state represented by `deleted_at`.
 
-## 9. Incertidumbres del dominio
+Important invariants:
 
-Antes de cerrar el documento, deben revisarse:
+- The name must not be empty and is trimmed by the domain.
+- The price must be greater than zero according to the domain rule.
+- Stock must never become negative.
+- Withdrawing more stock than is available must fail.
+- A category must be associated with the product.
+- An absent image key is represented as `NULL`, not an empty string.
+- Product retirement uses logical deletion rather than physical deletion.
 
-- El estado actual de la restricción física para precio positivo.
-- El estado actual de la restricción física para cantidad positiva.
-- La FK de `sale.sold_by_user_id` hacia `user`.
-- La decisión sobre reportes que agrupan por categoría histórica cuando la categoría cambia de nombre.
+The database constraint `ck_product_stock_non_negative` enforces non-negative stock. The source identifies the physical price constraint as pending or requiring verification; therefore, the positive-price domain rule must not be presented as an already-enforced database constraint.
 
-Estas cuestiones deben permanecer explícitas hasta que la fuente o el responsable del sistema las resuelva.
+**Source reference:** `spec/data-model.md`, §2.2 and the relevant entries in §3 and the task list.
 
-## 10. Fuente de referencia
+### 3.3 Sale
 
-Este documento deriva de las definiciones de entidades, relaciones, reglas de dominio y tareas pendientes descritas en `spec/data-model.md`.
+`Sale` is the aggregate root for a sale transaction.
 
+Its responsibilities include managing sale lines, applying the documented stock-withdrawal behavior, calculating the total, and checking whether the sale can be confirmed.
+
+Important invariants:
+
+- A sale must have at least one line to be confirmable.
+- A product cannot appear more than once in the same sale, according to the domain rule.
+- Adding a sale line withdraws stock before adding the line.
+- A registered sale is treated as immutable.
+- The sale total is calculated from its lines rather than stored as a database column.
+
+The unique database index on `(sale_id, product_id)` is identified in the source as part of T-20. The final documentation must preserve the source's status for this index and any related task.
+
+**Source reference:** `spec/data-model.md`, §2.3 and the relevant physical-index and task entries.
+
+### 3.4 SaleItem
+
+`SaleItem` is an entity internal to the `Sale` aggregate. It must not exist independently of its sale in the documented domain model.
+
+It represents the product and quantity included in a sale and preserves the relevant historical values from the transaction.
+
+Important invariants:
+
+- The line belongs to a sale.
+- The quantity must be greater than zero according to the domain rule.
+- The unit price and product name represent the values captured at the time of the sale.
+- The historical category name is retained as described by the source.
+- The subtotal is calculated from the historical unit price and quantity.
+
+The source distinguishes domain validation from database enforcement. In particular, the physical enforcement status of the positive-quantity rule must not be overstated.
+
+**Source reference:** `spec/data-model.md`, §2.4 and the physical model and foreign-key sections.
+
+### 3.5 User
+
+`User` represents an internal operator.
+
+The documented roles are `admin` and `seller`.
+
+Important invariants:
+
+- The username must be unique.
+- The domain normalizes usernames to lowercase and trims them.
+- The password hash must be present and non-empty.
+- The domain uses `password_hash`, not the plaintext password.
+- Role validation is a domain responsibility unless the source confirms a corresponding database constraint.
+
+The foreign key from `sale.sold_by_user_id` to `user` is identified as pending under T-12. The existence of the field does not establish that the database relationship is already enforced.
+
+**Source reference:** `spec/data-model.md`, §2.5, §5, and T-12.
+
+## 4. Value objects and calculations
+
+### Money
+
+The `Money` value object applies rounding to two decimal places using `MidpointRounding.AwayFromZero`, according to the source.
+
+The physical monetary column uses `numeric(18,2)`. The system is monocurrency by construction; the database model does not contain currency columns.
+
+The source notes that `Money` can represent zero, so the positive-price rule must be enforced by the relevant product behavior rather than assumed from the value object's constructor.
+
+### Quantity
+
+The `Quantity` value object rejects values that do not satisfy the domain's positive-quantity rule.
+
+The existence of this validation does not prove that PostgreSQL has a corresponding `CHECK` constraint.
+
+### Subtotal and total
+
+The line subtotal is calculated as historical unit price multiplied by quantity.
+
+The sale total is calculated by summing line subtotals.
+
+Neither calculation requires a separate persisted subtotal or total column in the supplied model.
+
+**Source reference:** `spec/data-model.md`, §1–§3 and §2.2–§2.4.
+
+## 5. Domain rules versus database constraints
+
+The following distinctions must remain explicit:
+
+| Rule | Domain behavior | Database status described by the source |
+|---|---|---|
+| Stock is non-negative | Product stock operations enforce the rule. | Confirmed: `ck_product_stock_non_negative`. |
+| Product price is positive | Product price-change behavior validates the rule. | Pending or requires verification; do not claim a confirmed `CHECK`. |
+| Sale-line quantity is positive | `Quantity` validates the rule. | Physical constraint status requires verification. |
+| A sale has at least one line before confirmation | `Sale.EnsureConfirmable`. | Domain-only; not guaranteed by a normal row-level `CHECK`. |
+| A product is not repeated within a sale | `Sale.AddItem` rejects duplicates. | A unique index is identified in connection with T-20; retain the source's current status. |
+| A sale line belongs to a sale | Domain ownership and sale-line relationship. | `sale_id` relationship uses `ON DELETE CASCADE` as described in the source. |
+| A sale is associated with a user | `sold_by_user_id` represents the association. | Foreign key is pending under T-12. |
+
+**Source reference:** `spec/data-model.md`, §2–§5 and the task list.
+
+## 6. Domain behavior: adding a sale line
+
+The documented behavior of `Sale.AddItem` is:
+
+1. Receive a product and quantity for the sale.
+2. Validate the relevant domain rules.
+3. Withdraw the requested quantity from the product's stock.
+4. Create the sale line with the relevant historical product values.
+5. Add the line to the sale.
+6. Calculate the subtotal from the historical unit price and quantity.
+
+The operation's documented order matters: stock is withdrawn before the line is added.
+
+The source does not establish every detail of database transactions, rollback behavior, or failure recovery. Those mechanisms must not be invented as confirmed architecture.
+
+**Source reference:** `spec/data-model.md`, §2.2–§2.4.
+
+## 7. Domain events
+
+The supplied model identifies domain entities and behavior but does not, by itself, confirm an implemented domain-event mechanism or message broker.
+
+Events such as `SaleConfirmed` or `StockWithdrawn` could be considered **proposed domain events** for future design, but they must not be documented as existing events without evidence from the source.
+
+No event-driven infrastructure is assumed in this evaluation.
+
+## 8. Open questions
+
+The following items must remain visible until the source confirms their resolution:
+
+- Physical enforcement of positive product price.
+- Physical enforcement of positive sale-line quantity.
+- Completion status of the product foreign key for `sale_item` under T-20.
+- Completion status of the user foreign key for `sale` under T-12.
+- Reporting behavior when historical category names differ after a category rename.
+
+## 9. Traceability
+
+This document is derived from the entity definitions, invariants, physical-model descriptions, foreign-key policy, and pending-task information in `spec/data-model.md`.
+
+The supplied model takes precedence over unsupported assumptions or descriptions copied from unrelated projects.
