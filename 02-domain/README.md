@@ -115,5 +115,44 @@ Roles identificados:
 El dominio no debe manejar contraseñas en texto plano. Los hashes no deben exponerse en registros de aplicación.
 
 El modelo no representa a un cliente comprador mediante esta entidad.
+## 4. Relaciones principales
 
+| Relación | Significado |
+|---|---|
+| Category → Product | Una categoría puede clasificar varios productos. |
+| Sale → SaleItem | Una venta contiene sus líneas de detalle. |
+| Product → SaleItem | Una línea hace referencia al producto asociado. |
+| User → Sale | Una venta se asocia con el usuario que la realiza mediante `sold_by_user_id`; la FK aparece pendiente en la fuente. |
+
+Las relaciones anteriores representan el significado de negocio. El estado exacto de cada clave foránea debe verificarse en la sección física del modelo de datos.
+
+## 5. Reglas de negocio
+
+| ID | Regla | Estado o evidencia |
+|---|---|---|
+| DOM-01 | El stock de un producto no puede ser negativo. | Implementada en PostgreSQL mediante `ck_product_stock_non_negative`. |
+| DOM-02 | El precio del producto debe ser positivo. | Regla de dominio; estado físico contradictorio en la fuente, requiere verificación. |
+| DOM-03 | La cantidad de una línea debe ser mayor que cero. | Regla de dominio; restricción física pendiente o por verificar. |
+| DOM-04 | Una venta debe tener al menos una línea para ser confirmable. | Validada mediante `Sale.EnsureConfirmable`. |
+| DOM-05 | La venta es inmutable. | Regla del dominio; no se describen puertos de edición o eliminación. |
+| DOM-06 | La línea conserva el precio histórico del producto. | Regla de conservación de datos de la venta. |
+| DOM-07 | La línea conserva el nombre y la categoría históricos. | Regla de conservación de datos de la venta. |
+| DOM-08 | El subtotal y el total se calculan, no se persisten como campos. | Cálculo derivado de las líneas. |
+| DOM-09 | La retirada de un producto es lógica. | Se utiliza `deleted_at`. |
+| DOM-10 | Las contraseñas se representan mediante un hash. | El dominio no maneja contraseñas en texto plano. |
+
+Los identificadores DOM-01 a DOM-10 son identificadores documentales para esta reconstrucción; no se deben confundir con identificadores oficiales de la fuente.
+
+## 6. Ciclo de una venta
+
+A partir de las reglas documentadas, el proceso de negocio puede resumirse así:
+
+1. Se identifica el producto que se venderá.
+2. Se determina la cantidad solicitada.
+3. La operación de agregar una línea retira stock antes de incorporar la línea, según el comportamiento descrito de `Sale.AddItem`.
+4. Se conserva en la línea el precio, nombre y categoría históricos del producto.
+5. Antes de confirmar la venta, `Sale.EnsureConfirmable` verifica que exista al menos una línea.
+6. El subtotal de cada línea y el total de la venta se calculan a partir de sus datos.
+
+Este resumen representa las reglas descritas, no una especificación completa de transacciones, concurrencia o recuperación ante fallos. Esos detalles deben documentarse solo si la fuente los confirma.
 
