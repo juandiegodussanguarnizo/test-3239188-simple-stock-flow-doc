@@ -1,208 +1,274 @@
 # 05 — Architecture
 
-## 1. Propósito
+## 1. Purpose
 
-Este documento reconstruye la arquitectura identificable a partir de `spec/data-model.md`.
+This document reconstructs the architecture supported by [`spec/data-model.md`](../spec/data-model.md).
 
-La descripción se centra en el modelo de persistencia, las entidades del dominio, las reglas y las responsabilidades que pueden inferirse de las operaciones documentadas.
+The objective is to identify the domain responsibilities, persistence structure, relationships, rules, and reporting responsibilities that can be established from the supplied specification.
 
-No se afirma la existencia de controladores HTTP, interfaces gráficas, microservicios o mecanismos de mensajería que no estén respaldados por la fuente.
+This document distinguishes confirmed facts from conceptual organization and unresolved implementation details.
 
-## 2. Vista general
+## 2. Architectural overview
 
-La solución descrita utiliza PostgreSQL para almacenar la información del sistema en el esquema `sales`.
+The confirmed persistence technology is PostgreSQL. The database is named `simple_stock_flow`, and the relevant schema is `sales`.
 
-Las responsabilidades identificadas pueden organizarse conceptualmente en tres áreas:
+The physical model identifies five tables:
 
-1. **Dominio:** representa las entidades y aplica reglas como la confirmabilidad de una venta.
-2. **Persistencia:** conserva productos, categorías, ventas, líneas de venta y usuarios.
-3. **Consultas y reportes:** obtiene información derivada, incluidos agregados de productos.
+- `category`
+- `product`
+- `sale`
+- `sale_item`
+- `user`
 
-Esta separación es una representación conceptual para documentar el modelo. La fuente debe consultarse para confirmar las clases, interfaces y componentes concretos de la implementación
+The domain model identifies corresponding concepts, including `Category`, `Product`, `Sale`, `SaleItem`, and `User`.
 
-## 3. Modelo de persistencia
+The source also identifies domain behavior such as `Product.Withdraw`, `Sale.AddItem`, and `Sale.EnsureConfirmable`, as well as calculated reporting results.
 
-### 3.1. Esquema
+These elements establish domain and persistence responsibilities. They do not, by themselves, prove the existence of a specific frontend, HTTP API, deployment topology, or microservice architecture.
 
-- Motor de persistencia: PostgreSQL.
-- Esquema: `sales`.
-- Tablas principales: `category`, `product`, `sale`, `sale_item` y `user`.
+**Source references:** `spec/data-model.md`, §0–§3 and the entity definitions in §2.
 
-### 3.2. Entidades y responsabilidades
+## 3. Architectural responsibilities
 
-| Tabla | Responsabilidad |
+### 3.1 Domain responsibilities
+
+The domain is responsible for the business rules explicitly described in the source, including:
+
+- Validating product names and positive prices.
+- Preventing domain operations from withdrawing more stock than is available.
+- Maintaining the rules for sale-line quantities.
+- Preventing duplicate products within a sale.
+- Requiring at least one line before a sale can be confirmed.
+- Preserving historical sale-line values.
+- Calculating subtotals and sale totals.
+- Treating registered sales as immutable in the documented domain model.
+
+The source identifies the corresponding entities, value objects, and methods. The documentation must not replace those names with invented interfaces or services.
+
+### 3.2 Persistence responsibilities
+
+PostgreSQL stores the five modeled entities and their relationships.
+
+The database also enforces specific constraints, including non-negative product stock and the unique indexes identified by the physical model.
+
+The persistence layer must be documented separately from domain validation because a rule enforced only in the domain can be bypassed by writes that do not pass through that domain behavior.
+
+### 3.3 Reporting responsibilities
+
+The source describes aggregated product reporting. Report results are calculated from stored information rather than persisted as a separate reporting entity.
+
+The documentation must not introduce seller-based report grouping or other dimensions not supported by the source.
+
+## 4. Physical data model
+
+### 4.1 Category
+
+The `category` table represents the predefined product categories.
+
+The source describes five seeded categories and a read-only category repository. Category CRUD operations must not be assumed.
+
+### 4.2 Product
+
+The `product` table represents catalog items.
+
+Its documented fields include the product identifier, name, price, stock, category identifier, optional `image_key`, historical/category-related fields where specified by the physical model, and `deleted_at` for logical retirement.
+
+The database constraint `ck_product_stock_non_negative` prevents persisted stock from becoming negative.
+
+The source identifies the physical enforcement of positive price as pending or requiring verification. The domain rule and the physical constraint must therefore be documented separately.
+
+### 4.3 Sale
+
+The `sale` table represents sale records.
+
+The sale is associated with an internal user through `sold_by_user_id`. The source identifies the foreign key to `user` as pending under T-12.
+
+The presence of this column does not prove that PostgreSQL currently enforces the corresponding foreign key.
+
+### 4.4 SaleItem
+
+The `sale_item` table represents the lines belonging to a sale.
+
+The source describes a foreign key to `sale` with `ON DELETE CASCADE`, and identifies the relationship to `product` in connection with T-20.
+
+The final documentation must preserve the physical status recorded in the source, rather than assuming that all relationships are complete merely because they appear in the conceptual model.
+
+Sale-line fields preserve historical values as described by the source. Subtotals are calculated rather than stored as separate columns.
+
+### 4.5 User
+
+The `user` table represents internal users.
+
+The documented role values are `admin` and `seller`. The table includes `password_hash`, and the domain must not handle plaintext passwords.
+
+The physical model and task list remain authoritative for the enforcement status of username normalization and role validation.
+
+**Source references:** `spec/data-model.md`, §2–§5 and the relevant task entries.
+
+## 5. Relationships and referential integrity
+
+| Relationship | Documented behavior | Status to preserve |
+|---|---|---|
+| `product.category_id` → `category` | Product references a category; deletion policy is restrictive. | Follow the foreign-key definition in the physical model. |
+| `sale_item.sale_id` → `sale` | A sale line belongs to a sale; the source describes `ON DELETE CASCADE`. | Confirmed according to the source's physical model. |
+| `sale_item.product_id` → `product` | A sale line references a product. | Preserve the status associated with T-20. |
+| `sale.sold_by_user_id` → `user` | A sale identifies the associated user. | Foreign key pending under T-12. |
+
+The conceptual existence of a relationship must not be confused with the current existence of a physical foreign-key constraint.
+
+**Source reference:** `spec/data-model.md`, §5 and the relevant entity and task definitions.
+
+## 6. Domain rules and physical enforcement
+
+### 6.1 Stock
+
+The database enforces `stock >= 0` through `ck_product_stock_non_negative`.
+
+The domain also prevents withdrawing more stock than is available. This business behavior is distinct from the database's non-negative constraint.
+
+### 6.2 Price
+
+The domain requires `price > 0`.
+
+The source identifies the physical price constraint as pending or requiring verification. Do not claim that PostgreSQL currently enforces the positive-price rule unless the source confirms it.
+
+### 6.3 Quantity
+
+The domain requires a positive sale-line quantity through the `Quantity` value object.
+
+The physical enforcement status must follow the source's constraint and task information.
+
+### 6.4 Sale confirmability
+
+`Sale.EnsureConfirmable` requires at least one line before a sale can be confirmed.
+
+This is a domain rule. A normal row-level `CHECK` does not establish that a sale has at least one row in another table.
+
+### 6.5 Sale immutability
+
+The source describes a sale as immutable and identifies no domain ports for editing or deleting sales.
+
+This does not prove that every direct database update or deletion is physically rejected.
+
+### 6.6 Logical deletion
+
+Product retirement uses `deleted_at` rather than normal physical deletion.
+
+The source describes the corresponding logical-deletion mechanism. The architecture must not present logical deletion as a general hard-delete operation.
+
+## 7. Sale-line creation flow
+
+The documented `Sale.AddItem` behavior establishes the following conceptual sequence:
+
+1. Receive the product and requested quantity.
+2. Apply the relevant domain validations.
+3. Withdraw stock through `Product.Withdraw`.
+4. Create the sale line using the relevant historical product values.
+5. Add the line to the sale.
+6. Calculate the line subtotal from the historical unit price and quantity.
+7. Calculate the sale total from its line subtotals when required.
+
+The documented order is important: stock withdrawal occurs before the line is added.
+
+This sequence describes domain behavior, not a complete infrastructure transaction design. The source must be consulted before claiming specific rollback guarantees, transaction boundaries, retry policies, or concurrency mechanisms.
+
+**Source reference:** `spec/data-model.md`, §2.2–§2.4 and the relevant architectural decisions referenced by the source.
+
+## 8. Ports and adapters
+
+The supplied model supports the identification of domain behavior, persistence responsibilities, and aggregated read operations.
+
+However, this document must not invent concrete controller names, repository interfaces, application services, or adapters that cannot be verified in the source.
+
+Where the source identifies a port or interface, its actual name and responsibility should be used. Where the source does not establish a concrete implementation, document the responsibility without presenting a proposed component as an existing one.
+
+The following distinction applies:
+
+| Element | Documentation treatment |
 |---|---|
-| `category` | Mantener las categorías utilizadas por los productos. |
-| `product` | Conservar información del catálogo, precio, stock, categoría e imagen opcional. |
-| `sale` | Registrar la operación de venta y su información asociada. |
-| `sale_item` | Registrar productos, cantidades y valores históricos de una venta. |
-| `user` | Representar usuarios internos y sus roles. |
+| Domain entities and named methods | Document as identified by the source. |
+| PostgreSQL tables and constraints | Document according to the physical model. |
+| Aggregated reporting | Document the source-supported query responsibility. |
+| Unconfirmed controllers and endpoints | Do not present as implemented. |
+| Unconfirmed microservices or message brokers | Do not present as implemented. |
+| Proposed future components | Label explicitly as proposals, not existing architecture. |
 
-## 4. Relaciones de persistencia
+## 9. Reporting and historical data
 
-### 4.1. Producto y categoría
+The model supports aggregated product reporting computed from stored data.
 
-`product.category_id` referencia la categoría asociada al producto.
+The architecture must preserve the distinction between current product information and historical sale-line information.
 
-La fuente identifica una política `RESTRICT` para esta relación, por lo que no debe describirse como una relación que permita eliminar una categoría referenciada sin restricciones.
+The source identifies an unresolved decision involving reporting and historical category names. A category rename may affect how historical category values are grouped, depending on the reporting rule ultimately selected.
 
-### 4.2. Venta y líneas
+This behavior must remain an open decision until the source or an authorized decision resolves it.
 
-` sale_item.sale_id` referencia `sale`.
+The source does not establish seller-based reporting, and this architecture must not add it.
 
-La fuente describe una relación con comportamiento `CASCADE` para esta clave foránea. Su alcance es la relación física entre venta y líneas, y no debe interpretarse como autorización para editar o eliminar ventas desde el dominio.
+## 10. Dates, monetary values, and initialization
 
-### 4.3. Línea y producto
+### 10.1 Dates and timestamps
 
-` sale_item` referencia al producto correspondiente.
+The physical model uses `timestamptz`, and the source identifies UTC as the server time reference.
 
-La fuente indica que la clave foránea de producto para las líneas se incorpora mediante la tarea T-20. Se debe comprobar el estado final de esa tarea y la sección del modelo físico antes de afirmar su estado actual sin reservas.
+Do not invent additional timezone-conversion behavior beyond what the source establishes.
 
-### 4.4. Venta y usuario
+### 10.2 Monetary values
 
-` sale.sold_by_user_id` identifica al usuario asociado con la venta.
+The monetary model uses a single currency by construction. No currency columns are defined.
 
-La clave foránea hacia `user` aparece como pendiente en la fuente. La documentación debe distinguir la existencia del campo de la existencia efectiva de la restricción física.
-## 5. Reglas de persistencia
+`Money` rounds to two decimal places using `MidpointRounding.AwayFromZero`, and the physical monetary column uses `numeric(18,2)`.
 
-### 5.1. Stock
+### 10.3 Administrator initialization
 
-Existe una restricción `CHECK` identificada como `ck_product_stock_non_negative`, que impide almacenar stock negativo.
+The source describes initialization of an initial administrator at application startup using credentials supplied through the environment.
 
-Esta regla está implementada en PostgreSQL.
+Do not document this as an SQL seed-user insertion if the source specifies application initialization.
 
-### 5.2. Precio
+## 11. Security and data integrity
 
-El precio positivo se describe como regla del dominio. La fuente contiene información contradictoria sobre el estado de la restricción física correspondiente.
+The architecture must preserve the following source-supported controls:
 
-No debe afirmarse que existe un `CHECK` para precio positivo sin comprobar el apartado físico y las tareas relacionadas.
+- Persisted product stock cannot be negative.
+- Passwords are represented by hashes in the domain and persisted model.
+- Password hashes must not be exposed in application logs.
+- Historical sale-line values must be retained as specified by the model.
+- Products use logical retirement through `deleted_at`.
+- Category and product relationships follow the documented foreign-key policy.
+- Pending constraints and relationships must not be represented as confirmed.
+- No customer entity or unsupported customer data is added to the model.
 
-### 5.3. Cantidad
+**Source references:** `spec/data-model.md`, the entity definitions, physical model, foreign-key policy, and credential-handling rules.
 
-La cantidad de una línea debe ser mayor que cero según la regla de dominio. El estado de la restricción física correspondiente debe verificarse en la fuente.
+## 12. Unresolved architectural questions
 
-### 5.4. Valores calculados
-
-Los subtotales de las líneas y el total de la venta se calculan a partir de los datos correspondientes.
-
-No se deben documentar como columnas persistidas del modelo.
-
-## 6. Dominio y responsabilidades
-
-### 6.1. Product
-
-Representa el producto y sus datos de catálogo.
-
-Su responsabilidad incluye mantener la información relevante del producto y respetar las reglas descritas para el precio y el stock.
-
-### 6.2. Sale
-
-Representa la venta y controla la regla de confirmación documentada mediante `EnsureConfirmable`.
-
-Una venta debe contener al menos una línea para ser confirmable.
-
-La fuente describe la venta como inmutable y no presenta puertos para editarla o eliminarla.
-
-### 6.3. SaleItem
-
-Representa cada línea de una venta.
-
-Conserva los valores históricos relevantes del producto y la cantidad vendida. El subtotal se deriva de la cantidad y del precio unitario histórico.
-
-### 6.4. Category
-
-Representa las categorías iniciales del catálogo. No debe suponerse una funcionalidad de administración CRUD de categorías si no está descrita en la fuente.
-
-### 6.5. User
-
-Representa usuarios internos y los roles `admin` y `seller`.
-
-El dominio trabaja con `password_hash`, no con contraseñas en texto plano.
-
-## 7. Operaciones y flujo de venta
-
-La operación descrita de `Sale.AddItem` retira stock antes de añadir la línea a la venta.
-
-El flujo conceptual de una venta es:
-
-1. Identificar el producto y la cantidad.
-2. Aplicar las validaciones correspondientes.
-3. Retirar el stock según el comportamiento documentado.
-4. Crear la línea conservando los valores históricos del producto.
-5. Verificar que la venta tenga al menos una línea antes de confirmarla.
-6. Calcular los subtotales y el total a partir de las líneas.
-
-Este flujo resume el comportamiento del dominio. La fuente no permite especificar todos los detalles de transacciones, concurrencia, reversión de operaciones o tratamiento de fallos. Esos detalles deben confirmarse antes de documentarlos como decisiones de arquitectura.
-
-## 8. Puertos y adaptadores
-
-La evaluación solicita reconstruir la arquitectura a partir de la fuente. En consecuencia, esta sección diferencia las responsabilidades inferibles de las interfaces concretas.
-
-### 8.1. Responsabilidades identificadas
-
-- El dominio contiene reglas de entidades como `Sale` y `SaleItem`.
-- PostgreSQL conserva las entidades y relaciones descritas.
-- Las consultas agregadas permiten obtener información para reportes.
-- Las reglas físicas y las reglas del dominio no son equivalentes.
-
-### 8.2. Interfaces no confirmadas
-
-No se declaran nombres concretos de repositorios, controladores, servicios de aplicación o adaptadores cuando no pueden verificarse en `spec/data-model.md`.
-
-Si la fuente define puertos o interfaces explícitas en otra sección, deben documentarse con sus nombres y responsabilidades exactas, sin reemplazarlos por interfaces inventadas.
-
-## 9. Reportes y consultas
-
-El modelo contempla información agregada para reportes de productos.
-
-Los resultados agregados se calculan en la base de datos y no se persisten como entidades independientes.
-
-La fuente no contempla un desglose por vendedor.
-
-Existe una decisión pendiente sobre la agrupación por categoría histórica: si el nombre de una categoría cambia, el reporte puede generar filas diferentes para nombres históricos distintos. Esta decisión debe contrastarse con la especificación de reporte señalada en el modelo y confirmarse con el responsable del sistema.
-
-## 10. Fechas, moneda y configuración
-
-### 10.1. Fechas
-
-Las marcas de tiempo utilizan `timestamptz`, con UTC como referencia del servidor.
-
-### 10.2. Moneda
-
-El modelo no incorpora campos de moneda. La solución descrita es monomoneda.
-
-### 10.3. Inicialización
-
-La fuente indica que el usuario administrador inicial se crea al iniciar la aplicación mediante credenciales provenientes del entorno, no mediante una inserción SQL de inicialización.
-
-La forma exacta de desplegar, almacenar o rotar esas credenciales debe documentarse únicamente si está descrita en la fuente.
-
-## 11. Integridad, privacidad y conservación
-
-- El stock persistido no puede ser negativo.
-- Las ventas y sus líneas conservan información histórica de las operaciones.
-- Los productos se retiran mediante eliminación lógica con `deleted_at`.
-- Los hashes de contraseñas no deben exponerse en registros de aplicación.
-- No se deben introducir datos de clientes como parte de la arquitectura porque el modelo no define una entidad de cliente.
-- No se deben afirmar campos `created_at` o `updated_at`, ya que la fuente indica que no existen.
-
-## 12. Decisiones pendientes y deuda técnica
-
-| Elemento | Situación que debe verificarse |
+| Item | Required treatment |
 |---|---|
-| Precio positivo | La fuente presenta información contradictoria sobre su restricción física. |
-| Cantidad positiva | Confirmar el estado final de la restricción física. |
-| FK de `sale_item` a `product` | Verificar el estado final de T-20 y la definición física. |
-| FK de `sale` a `user` | Aparece como pendiente en la fuente mediante T-12. |
-| Agrupación de reportes por categoría | Existe una decisión pendiente sobre nombres históricos y renombrados. |
-| Transacciones y concurrencia | No especificar comportamiento que no esté confirmado en la fuente. |
+| Positive product-price constraint | Keep the physical enforcement status pending or requiring verification. |
+| Positive sale-line quantity constraint | Verify against the source before claiming a database constraint. |
+| `sale_item` to `product` foreign key | Preserve the status associated with T-20. |
+| `sale` to `user` foreign key | Preserve pending status under T-12. |
+| Reporting after category renaming | Do not resolve without an authoritative decision. |
+| Transaction and concurrency guarantees | Do not claim behavior that the source does not establish. |
+| Concrete controllers, APIs, and deployment components | Do not invent implementation details. |
 
-Los identificadores de tarea deben comprobarse directamente en `spec/data-model.md`. Esta tabla no afirma que las tareas estén resueltas.
+## 13. Architecture consistency review
 
-## 13. Fuente de referencia
+Before submitting, verify that:
 
-Toda la arquitectura documentada se deriva de `spec/data-model.md`, especialmente de las definiciones del modelo físico, las relaciones, las reglas del dominio, los reportes y las tareas pendientes.
+- The architecture contains the same five tables as the source.
+- Domain rules are not misrepresented as physical database constraints.
+- The documented foreign-key status matches the source.
+- The sale-line creation sequence reflects `Sale.AddItem`.
+- Subtotals and totals are calculated, not stored.
+- Historical values are distinguished from current catalog values.
+- Reporting does not introduce unsupported seller-based grouping.
+- Product retirement is documented as logical deletion.
+- Unresolved decisions remain unresolved.
+- The architecture agrees with the context, domain, product, and requirements documents.
 
+## 14. Source of truth
 
+All architectural claims in this document derive from [`spec/data-model.md`](../spec/data-model.md), including its glossary, entity definitions, physical model, foreign-key policy, reporting definitions, and pending-task information.
 
-
+If an architectural statement cannot be supported by the supplied source, remove it or explicitly label it as an assumption or proposal.
