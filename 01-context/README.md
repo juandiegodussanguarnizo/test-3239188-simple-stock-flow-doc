@@ -49,3 +49,49 @@ El modelo de datos respalda las siguientes capacidades:
 
 El alcance anterior describe capacidades derivadas del modelo, no una confirmación de que exista una interfaz completa para todas ellas.
 
+## 5. Fuera del alcance confirmado
+
+No existe evidencia suficiente en el modelo para afirmar que el sistema incluye:
+
+- Gestión de clientes.
+- Registro de datos personales de compradores.
+- Gestión de proveedores.
+- Órdenes de compra o reposición de inventario.
+- Múltiples monedas.
+- Desglose de reportes por vendedor.
+- Auditoría mediante campos `created_at` y `updated_at`.
+- Edición o eliminación de ventas ya registradas.
+- Eliminación física de productos como operación habitual del catálogo.
+
+Estos puntos no deben documentarse como funcionalidades existentes sin una fuente adicional.
+
+## 6. Límites del sistema
+
+### 6.1. Persistencia
+
+PostgreSQL almacena las categorías, productos, ventas, líneas de venta y usuarios.
+
+### 6.2. Reglas de negocio
+
+Algunas reglas se encuentran implementadas mediante restricciones de base de datos, mientras que otras se validan únicamente en el dominio.
+
+La documentación debe distinguir ambos casos.
+
+### 6.3. Información histórica
+
+Las líneas de venta conservan valores históricos del producto. Por ello, un cambio posterior en el catálogo no debe reescribir automáticamente la información registrada en ventas anteriores.
+
+### 6.4. Credenciales
+
+La información de usuarios contempla `password_hash`. El modelo no justifica almacenar ni procesar contraseñas en texto plano dentro del dominio.
+
+## 7. Restricciones y consideraciones
+
+- El sistema utiliza PostgreSQL.
+- Las marcas de tiempo se almacenan con tipo `timestamptz` y el servidor utiliza UTC.
+- El modelo es monomoneda: no contiene campos para moneda.
+- Las categorías iniciales corresponden a cinco registros definidos en la fuente.
+- Los productos se retiran mediante eliminación lógica con `deleted_at`.
+- La fuente indica que el usuario administrador inicial se crea al iniciar la aplicación mediante credenciales provenientes del entorno, no mediante una inserción SQL de inicialización.
+
+
