@@ -1,254 +1,281 @@
-# 04 — Requirements
+# 04 — Requirements Specification
 
-## 1. Propósito
+## 1. Purpose
 
-Este documento reúne los requisitos funcionales y no funcionales que pueden derivarse de `spec/data-model.md`.
+This document derives functional and non-functional requirements for **Simple Stock Flow** from [`spec/data-model.md`](../spec/data-model.md).
 
-Los requisitos de este archivo son una reconstrucción documental. Sus identificadores se utilizan para facilitar la trazabilidad y no deben confundirse con identificadores oficiales de la fuente.
+The requirements describe behavior supported by the source. They do not establish unconfirmed screens, endpoints, deployment components, or business rules.
 
-## 2. Convenciones
+## 2. Requirement conventions
 
-- **Derivado:** capacidad o regla respaldada por el modelo de datos.
-- **Implementado en BD:** existe evidencia de una restricción o estructura física en PostgreSQL.
-- **Validado en dominio:** la regla se describe en el dominio de la aplicación.
-- **Pendiente / por verificar:** la fuente indica trabajo pendiente o presenta información contradictoria.
+Each requirement includes an identifier, a statement, and a traceability reference.
 
-No se asignan métricas de rendimiento ni acuerdos de servicio porque el modelo no proporciona esos valores.
+The following status distinctions apply:
 
-## 3. Requisitos funcionales
+- **Confirmed:** directly supported by the source.
+- **Domain-only:** enforced by domain behavior but not necessarily by PostgreSQL.
+- **Pending verification:** the physical implementation is pending or the source contains an unresolved inconsistency.
+- **Assumption:** not established by the source and therefore not treated as a confirmed requirement.
 
-### RF-01. Clasificación de productos
+The identifiers below are assigned for this documentation and do not imply that the source already uses these IDs.
 
-**Descripción:** el sistema debe permitir asociar los productos con una categoría.
+## 3. Functional requirements
 
-**Trazabilidad:** `product.category_id` y entidad `category`.
+### FR-01 — Product classification
 
-**Estado:** estructura de relación descrita en el modelo.
+The system must represent the association between a product and its category.
 
-### RF-02. Catálogo de productos
+**Traceability:** `product.category_id`, `category`, and the `Product.SetCategory` behavior.
 
-**Descripción:** el sistema debe representar productos con nombre, precio, existencias, categoría e imagen opcional.
+**Status:** The relationship is defined in the model. The physical foreign-key policy must follow the source.
 
-**Trazabilidad:** entidad `product`.
+### FR-02 — Product catalog
 
-**Restricción:** no se deben añadir como existentes atributos no definidos, como SKU o descripción.
+The system must represent a product with its name, price, stock, category, and optional image key.
 
-### RF-03. Control de stock no negativo
+**Traceability:** `product` and `Product`.
 
-**Descripción:** el sistema debe impedir que el stock persistido de un producto sea negativo.
+**Constraint:** Do not introduce SKU, description, or reference-code fields as existing model attributes.
 
-**Trazabilidad:** restricción `ck_product_stock_non_negative`.
+### FR-03 — Non-negative stock
 
-**Estado:** implementado en PostgreSQL.
+The system must prevent negative stock from being persisted.
 
-### RF-04. Validación de precio positivo
+**Traceability:** `ck_product_stock_non_negative`.
 
-**Descripción:** el precio del producto debe ser positivo.
+**Status:** Confirmed database constraint.
 
-**Trazabilidad:** regla de precio descrita en las secciones de dominio del modelo.
+### FR-04 — Positive product price
 
-**Estado:** validación de dominio; el estado de la restricción física requiere verificación debido a información contradictoria en la fuente.
+The domain must reject product prices that do not satisfy the positive-price rule.
 
-### RF-05. Registro de ventas
+**Traceability:** `Product.ChangePrice` and the `Money` behavior described in the source.
 
-**Descripción:** el sistema debe representar una venta con la información de la operación, incluida su fecha y el usuario asociado.
+**Status:** Domain rule. The source identifies the physical constraint as pending or requiring verification; do not claim that a database `CHECK` is already enforced.
 
-**Trazabilidad:** entidad `sale` y campo `sold_by_user_id`.
+### FR-05 — Sale representation
 
-**Estado:** la relación lógica está descrita; la clave foránea hacia `user` figura como pendiente.
+The system must represent a sale and its associated information, including the user identifier and sale timestamp as defined in the model.
 
-### RF-06. Registro de líneas de venta
+**Traceability:** `sale` and `sale.sold_by_user_id`.
 
-**Descripción:** el sistema debe representar cada producto y cantidad incluidos en una venta mediante `sale_item`.
+**Status:** The field is described by the model. The foreign key to `user` is pending under T-12.
 
-**Trazabilidad:** entidad `sale_item` y su relación con `sale` y `product`.
+### FR-06 — Sale-line representation
 
-### RF-07. Validación de cantidad positiva
+The system must represent each sale line through `sale_item`, including its relationship to a sale and the product-related values required by the source.
 
-**Descripción:** la cantidad de una línea de venta debe ser mayor que cero.
+**Traceability:** `sale_item` and the physical model.
 
-**Trazabilidad:** regla de dominio asociada a `SaleItem`.
+**Status:** Follow the current source status for the related foreign keys, including T-20.
 
-**Estado:** regla de dominio; la restricción física debe verificarse según las tareas pendientes de la fuente.
+### FR-07 — Positive sale-line quantity
 
-### RF-08. Confirmación de ventas
+The domain must reject a sale-line quantity that is not greater than zero.
 
-**Descripción:** una venta solo debe poder confirmarse cuando contiene al menos una línea.
+**Traceability:** `Quantity` and the `SaleItem` rules.
 
-**Trazabilidad:** método `Sale.EnsureConfirmable`.
+**Status:** Domain rule. Physical enforcement must be verified against the source.
 
-**Estado:** validado en el dominio.
+### FR-08 — Sale confirmability
 
-### RF-09. Conservación del precio histórico
+A sale must contain at least one line before it can be confirmed.
 
-**Descripción:** cada línea de venta debe conservar el precio del producto utilizado en la operación, sin cambiar automáticamente cuando se actualiza el catálogo.
+**Traceability:** `Sale.EnsureConfirmable`.
 
-**Trazabilidad:** valores históricos de `sale_item`.
+**Status:** Domain-only rule; do not claim it is enforced by a normal database `CHECK`.
 
-### RF-10. Conservación de datos históricos
+### FR-09 — Duplicate product prevention
 
-**Descripción:** cada línea de venta debe conservar el nombre y la categoría históricos del producto según lo descrito por el modelo.
+The domain must prevent the same product from being added more than once to a sale.
 
-**Trazabilidad:** campos históricos de `sale_item`.
+**Traceability:** `Sale.AddItem` and the unique index on `(sale_id, product_id)` described in the source.
 
-### RF-11. Cálculo de subtotales
+**Status:** The domain rule is defined. The physical index status must be reported according to the source and T-20.
 
-**Descripción:** el subtotal de una línea debe calcularse a partir de su cantidad y precio unitario histórico.
+### FR-10 — Stock withdrawal when adding a sale line
 
-**Trazabilidad:** reglas de cálculo de `SaleItem`.
+When a sale line is added, the documented domain behavior must withdraw the requested quantity from product stock before adding the line.
 
-**Restricción:** el subtotal no se almacena como campo persistido.
+**Traceability:** `Sale.AddItem` and `Product.Withdraw`.
 
-### RF-12. Cálculo del total de la venta
+**Status:** Domain behavior. Do not infer transaction rollback or concurrency guarantees beyond those established by the source.
 
-**Descripción:** el total de una venta debe obtenerse a partir de sus líneas.
+### FR-11 — Historical product values
 
-**Trazabilidad:** reglas de cálculo de la venta.
+A sale line must preserve the relevant product values captured at the time of the sale, including the historical unit price and product name.
 
-**Restricción:** el total no se almacena como campo persistido.
+**Traceability:** `Sale.AddItem`, `SaleItem`, and the historical fields in `sale_item`.
 
-### RF-13. Inmutabilidad de las ventas
+### FR-12 — Historical category name
 
-**Descripción:** una venta registrada debe tratarse como inmutable de acuerdo con las reglas del dominio.
+A sale line must preserve the historical category name as described by the model.
 
-**Trazabilidad:** definición de `Sale` y ausencia de puertos para editar o eliminar ventas.
+**Traceability:** `sale_item.category_name` and the relevant historical-reporting decisions.
 
-**Estado:** regla del dominio; no implica por sí sola la existencia de una restricción física que impida cualquier actualización.
+**Constraint:** Do not add a foreign key from the historical category name to the current category record unless the source explicitly requires it.
 
-### RF-14. Retiro lógico de productos
+### FR-13 — Subtotal calculation
 
-**Descripción:** el sistema debe permitir representar el retiro de un producto mediante `deleted_at`, sin eliminar físicamente su registro.
+The subtotal of a sale line must be calculated from its historical unit price and quantity.
 
-**Trazabilidad:** entidad `product`.
+**Traceability:** `SaleItem.Subtotal`.
 
-### RF-15. Roles de usuario
+**Constraint:** The subtotal must not be documented as a persisted column in the supplied model.
 
-**Descripción:** el modelo debe distinguir los roles internos `admin` y `seller`.
+### FR-14 — Sale total calculation
 
-**Trazabilidad:** entidad `user` y sus valores de rol.
+The sale total must be calculated from its sale-line subtotals.
 
-**Restricción:** los permisos detallados de cada rol no se especifican aquí porque la fuente no los define por completo.
+**Traceability:** `Sale.Total`.
 
-### RF-16. Protección de credenciales
+**Constraint:** The total must not be documented as a persisted column in the supplied model.
 
-**Descripción:** el dominio debe trabajar con la representación hash de las contraseñas mediante `password_hash` y no con contraseñas en texto plano.
+### FR-15 — Sale immutability
 
-**Trazabilidad:** entidad `user` y reglas de credenciales.
+A registered sale must be treated as immutable by the documented domain model.
 
-### RF-17. Reporte agregado de productos
+**Traceability:** The `Sale` definition and the absence of domain ports for editing or deleting a sale.
 
-**Descripción:** el sistema debe poder obtener información agregada para reportes de productos, según las consultas descritas en la fuente.
+**Constraint:** Domain immutability does not, by itself, prove that PostgreSQL rejects every direct update or deletion.
 
-**Trazabilidad:** sección de reportes de `spec/data-model.md`.
+### FR-16 — Logical product retirement
 
-**Restricción:** no se debe afirmar que el reporte presenta un desglose por vendedor, porque la fuente no lo contempla.
+The model must represent product retirement through `deleted_at` rather than normal physical deletion.
 
-### RF-18. Inicialización del administrador
+**Traceability:** `product.deleted_at` and the logical-deletion behavior described in the source.
 
-**Descripción:** la aplicación contempla crear un usuario administrador inicial al iniciar, utilizando credenciales provenientes del entorno.
+### FR-17 — Internal roles and credentials
 
-**Trazabilidad:** sección de inicialización/configuración de `spec/data-model.md`.
+The system must represent internal users with the role values `admin` and `seller`, and the domain must work with password hashes rather than plaintext passwords.
 
-**Restricción:** la fuente indica que esta inicialización no se realiza mediante una inserción SQL de usuario administrador.
+**Traceability:** `user.role`, `user.password_hash`, and the `User` rules.
 
-## 4. Requisitos no funcionales
+**Constraint:** Detailed permissions for each role must not be invented.
 
-### RNF-01. Persistencia relacional
+### FR-18 — Aggregated product reporting
 
-**Descripción:** la persistencia descrita debe utilizar PostgreSQL.
+The system must support the aggregated product reporting described by the source, with calculated results rather than a separate persisted reporting entity.
 
-**Trazabilidad:** definición del modelo físico.
+**Traceability:** The reporting section of `spec/data-model.md`.
 
-### RNF-02. Consistencia de inventario
+**Constraint:** Do not claim that reports are grouped by seller. Preserve any unresolved decision about historical category names.
 
-**Descripción:** la persistencia debe mantener la restricción de stock no negativo.
+### FR-19 — Initial administrator
 
-**Trazabilidad:** `ck_product_stock_non_negative`.
+The documented initialization process must reflect the source's description of an initial administrator created at application startup using credentials supplied through the environment.
 
-### RNF-03. Conservación histórica
+**Traceability:** The initialization and configuration section of `spec/data-model.md`.
 
-**Descripción:** la información histórica de las líneas de venta debe preservarse frente a cambios posteriores del catálogo.
+**Constraint:** Do not describe the administrator as a SQL seed user if the source specifies application initialization.
 
-**Trazabilidad:** campos históricos de `sale_item`.
+## 4. Non-functional requirements
 
-### RNF-04. Manejo seguro de credenciales
+### NFR-01 — Relational persistence
 
-**Descripción:** el dominio no debe manejar contraseñas en texto plano y los hashes no deben exponerse en registros de aplicación.
+The documented persistence model must use PostgreSQL with the `sales` schema.
 
-**Trazabilidad:** reglas de `user` y privacidad de `spec/data-model.md`.
+**Traceability:** The physical database model in `spec/data-model.md`.
 
-### RNF-05. Tratamiento de fechas
+### NFR-02 — Stock integrity
 
-**Descripción:** las marcas de tiempo deben representarse mediante `timestamptz`, utilizando UTC según la configuración descrita.
+The database must enforce non-negative persisted product stock.
 
-**Trazabilidad:** convenciones de fecha y hora del modelo.
+**Traceability:** `ck_product_stock_non_negative`.
 
-### RNF-06. Consistencia monetaria
+### NFR-03 — Historical consistency
 
-**Descripción:** el modelo debe tratar los valores monetarios bajo una única moneda, dado que no existen campos de moneda.
+Historical sale-line values must remain distinct from current catalog values.
 
-**Trazabilidad:** estructura de precios e importes.
+**Traceability:** `sale_item` historical fields and the `SaleItem` behavior.
 
-### RNF-07. Retención lógica
+### NFR-04 — Credential handling
 
-**Descripción:** la retirada de productos debe conservar el registro físico mediante `deleted_at`.
+The domain must not handle plaintext passwords, and password hashes must not be exposed in application logs.
 
-**Trazabilidad:** entidad `product`.
+**Traceability:** The `User` definition and credential-handling rules in the source.
 
-### RNF-08. Trazabilidad documental
+### NFR-05 — Timestamp handling
 
-**Descripción:** cada requisito derivado debe poder relacionarse con una entidad, regla, relación o decisión identificable de la fuente.
+Timestamp fields must follow the source's `timestamptz` representation and UTC server-time convention.
 
-**Trazabilidad:** criterio de la evaluación SDD.
+**Traceability:** The physical model and the source's date/time conventions.
 
-No se establecen objetivos de disponibilidad, tiempos de respuesta, capacidad concurrente ni métricas de rendimiento porque la fuente no aporta valores para ellos.
+### NFR-06 — Monetary consistency
 
-## 5. Requisitos pendientes o por verificar
+The documented model must remain monocurrency because the schema does not contain currency fields.
 
-| Tema | Situación descrita | Acción documental |
+**Traceability:** The monetary definitions and physical schema.
+
+### NFR-07 — Logical deletion
+
+Product retirement must preserve the database record through the documented `deleted_at` mechanism.
+
+**Traceability:** `product.deleted_at` and the logical-deletion rules.
+
+### NFR-08 — Documentation traceability
+
+Every derived requirement must be traceable to a source section, entity, field, constraint, domain method, or task identifier. Unsupported statements must be labeled as assumptions or excluded.
+
+**Traceability:** The evaluation instructions in the repository's root `README.md`.
+
+### NFR-09 — No unsupported performance targets
+
+No response-time, throughput, availability, or capacity target is established by this requirements document because the supplied source does not provide numerical values for these metrics.
+
+**Traceability:** Absence of defined numerical service targets in the supplied model.
+
+## 5. Pending items and verification
+
+| Item | Source status | Required documentation treatment |
 |---|---|---|
-| Precio positivo | Hay información contradictoria sobre su restricción física. | Verificar la sección de restricciones y tareas de la fuente. |
-| Cantidad positiva | La regla de dominio existe; la restricción física requiere confirmación. | No afirmar que existe un `CHECK` sin evidencia. |
-| FK del usuario en la venta | `sale.sold_by_user_id` aparece como pendiente. | Marcar la relación física como pendiente. |
-| Reporte por categoría | Hay una decisión pendiente sobre nombres históricos y renombrados. | Registrar la discrepancia y no resolverla por suposición. |
-## 6. Matriz de trazabilidad
+| Positive product price in PostgreSQL | Pending or inconsistent in the source | Keep the domain rule separate from physical enforcement. |
+| Positive quantity in PostgreSQL | Physical enforcement requires verification | Do not claim a confirmed `CHECK` without evidence. |
+| `sale.sold_by_user_id` foreign key | Pending under T-12 | Describe the field separately from the pending FK. |
+| `sale_item` to `product` foreign key | Associated with T-20 | Use the physical-model and task status given by the source. |
+| Unique `(sale_id, product_id)` index | Described in connection with T-20 | Preserve the source's documented status. |
+| Reporting after category renaming | Unresolved decision | Do not silently select a reporting behavior. |
 
-| Requisito | Elemento de referencia |
+## 6. Traceability matrix
+
+| Requirement | Main source element |
 |---|---|
-| RF-01 | `product.category_id`, `category` |
-| RF-02 | Entidad `product` |
-| RF-03 | `ck_product_stock_non_negative` |
-| RF-04 | Regla de precio en el dominio y tareas relacionadas |
-| RF-05 | Entidad `sale`, `sold_by_user_id` |
-| RF-06 | Entidad `sale_item` y sus relaciones |
-| RF-07 | Regla de cantidad de `SaleItem` |
-| RF-08 | `Sale.EnsureConfirmable` |
-| RF-09 | Precio histórico de `sale_item` |
-| RF-10 | Nombre y categoría históricos de `sale_item` |
-| RF-11 | Cálculo del subtotal |
-| RF-12 | Cálculo del total |
-| RF-13 | Inmutabilidad de `Sale` |
-| RF-14 | `product.deleted_at` |
-| RF-15 | Roles de `user` |
-| RF-16 | `user.password_hash` |
-| RF-17 | Sección de reportes |
-| RF-18 | Sección de inicialización del usuario administrador |
-| RNF-01 | Modelo físico PostgreSQL |
-| RNF-02 | Restricción de stock |
-| RNF-03 | Valores históricos de `sale_item` |
-| RNF-04 | Reglas de credenciales |
-| RNF-05 | `timestamptz` y UTC |
-| RNF-06 | Modelo monomoneda |
-| RNF-07 | Eliminación lógica |
-| RNF-08 | Criterios de gobierno documental |
+| FR-01 | `product.category_id`, `category` |
+| FR-02 | `Product`, `product` |
+| FR-03 | `ck_product_stock_non_negative` |
+| FR-04 | `Product.ChangePrice`, `Money`, relevant pending task |
+| FR-05 | `sale`, `sold_by_user_id`, T-12 |
+| FR-06 | `sale_item` and its relationships |
+| FR-07 | `Quantity`, `SaleItem` |
+| FR-08 | `Sale.EnsureConfirmable` |
+| FR-09 | `Sale.AddItem`, unique index, T-20 |
+| FR-10 | `Sale.AddItem`, `Product.Withdraw` |
+| FR-11 | Historical product values in `sale_item` |
+| FR-12 | `sale_item.category_name` |
+| FR-13 | `SaleItem.Subtotal` |
+| FR-14 | `Sale.Total` |
+| FR-15 | `Sale` immutability and absence of edit/delete ports |
+| FR-16 | `product.deleted_at` |
+| FR-17 | `user.role`, `user.password_hash` |
+| FR-18 | Reporting definitions |
+| FR-19 | Initial administrator initialization |
+| NFR-01 | PostgreSQL physical model |
+| NFR-02 | `ck_product_stock_non_negative` |
+| NFR-03 | Historical sale-line values |
+| NFR-04 | Credential-handling rules |
+| NFR-05 | `timestamptz`, UTC |
+| NFR-06 | Monocurrency model |
+| NFR-07 | `product.deleted_at` |
+| NFR-08 | Root evaluation instructions |
+| NFR-09 | No numerical service targets in the source |
 
-Los identificadores RF y RNF son propios de esta reconstrucción y deben ajustarse si la fuente de evaluación exige una nomenclatura distinta.
+## 7. Acceptance checklist
 
-## 7. Criterios de aceptación documental
-
-- Cada requisito describe una capacidad o restricción concreta.
-- Los requisitos distinguen entre comportamiento del dominio y restricciones físicas.
-- Las tareas pendientes no se describen como terminadas.
-- No se inventan métricas no presentes en la fuente.
-- Los requisitos mantienen trazabilidad con el modelo de datos.
-
+- [ ] Every requirement is traceable to the source.
+- [ ] Domain rules are distinguished from database constraints.
+- [ ] Pending tasks are not described as completed without evidence.
+- [ ] Calculated subtotals and totals are not represented as stored columns.
+- [ ] Historical sale-line values are documented correctly.
+- [ ] No unsupported customer, seller-reporting, API, or microservice features are introduced.
+- [ ] No unsupported performance or availability targets are invented.
+- [ ] The requirements agree with the domain, product, context, and architecture documents.
