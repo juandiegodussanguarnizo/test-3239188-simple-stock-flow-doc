@@ -95,4 +95,37 @@ No se debe presentar como funcionalidad existente:
 - El modelo utiliza una única moneda, sin campos de moneda.
 - Las marcas de tiempo se almacenan con `timestamptz` y se usa UTC.
 
+## 8. Criterios de éxito derivados
 
+Los siguientes criterios son verificables a partir del modelo y sirven como guía para evaluar la coherencia documental:
+
+- Los productos se relacionan con una categoría.
+- La persistencia impide almacenar stock negativo.
+- Una venta no es confirmable sin líneas.
+- Las líneas conservan sus valores históricos aunque cambie el catálogo.
+- El subtotal y el total se obtienen mediante cálculos.
+- Un producto retirado puede conservar su registro mediante eliminación lógica.
+
+La fuente no proporciona métricas cuantitativas de rendimiento, adopción o satisfacción; no se establecen metas numéricas inventadas.
+
+## 9. Riesgos y decisiones pendientes
+
+### 9.1. Restricciones de integridad
+
+El estado de las restricciones para precio y cantidad presenta información que debe verificarse dentro de `spec/data-model.md`.
+
+### 9.2. Asociación con el usuario
+
+La FK de `sale.sold_by_user_id` está identificada como pendiente. No debe darse por completada.
+
+### 9.3. Reportes por categoría
+
+La agrupación por nombre histórico de categoría puede producir filas separadas cuando una categoría cambia de nombre. La fuente señala una decisión pendiente respecto de la especificación del reporte.
+
+### 9.4. Alcance no descrito
+
+No se deben agregar capacidades de negocio que no estén respaldadas por el modelo.
+
+## 10. Fuente de referencia
+
+`spec/data-model.md`, definiciones de entidades, reglas de negocio, relaciones, reportes y tareas pendientes.
