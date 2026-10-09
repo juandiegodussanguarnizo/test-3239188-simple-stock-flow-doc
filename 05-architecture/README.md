@@ -18,5 +18,25 @@ Las responsabilidades identificadas pueden organizarse conceptualmente en tres �
 2. **Persistencia:** conserva productos, categorías, ventas, líneas de venta y usuarios.
 3. **Consultas y reportes:** obtiene información derivada, incluidos agregados de productos.
 
-Esta separación es una representación conceptual para documentar el modelo. La fuente debe consultarse para confirmar las clases, interfaces y componentes concretos de la implementación.
+Esta separación es una representación conceptual para documentar el modelo. La fuente debe consultarse para confirmar las clases, interfaces y componentes concretos de la implementación
+
+## 3. Modelo de persistencia
+
+### 3.1. Esquema
+
+- Motor de persistencia: PostgreSQL.
+- Esquema: `sales`.
+- Tablas principales: `category`, `product`, `sale`, `sale_item` y `user`.
+
+### 3.2. Entidades y responsabilidades
+
+| Tabla | Responsabilidad |
+|---|---|
+| `category` | Mantener las categorías utilizadas por los productos. |
+| `product` | Conservar información del catálogo, precio, stock, categoría e imagen opcional. |
+| `sale` | Registrar la operación de venta y su información asociada. |
+| `sale_item` | Registrar productos, cantidades y valores históricos de una venta. |
+| `user` | Representar usuarios internos y sus roles. |
+
+
 
