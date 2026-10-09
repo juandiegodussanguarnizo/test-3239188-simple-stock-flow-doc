@@ -1,131 +1,145 @@
-# 03 — Product
+# 03 — Product Definition
 
-## 1. Propósito
+## 1. Product name
 
-Este documento describe el problema que aborda el sistema, su visión y el alcance del producto reconstruido a partir de `spec/data-model.md`.
+**Simple Stock Flow**
 
-Las declaraciones de visión y objetivos que no aparezcan literalmente en el modelo se identifican como formulaciones derivadas, no como requisitos textuales originales.
+## 2. Product vision
 
-## 2. Problema identificado
+Simple Stock Flow represents a product catalog and sales workflow in which product information, available stock, sale transactions, and historical sale-line values are maintained consistently.
 
-El modelo representa información de productos, categorías, existencias, ventas, líneas de venta y usuarios internos.
+The product model emphasizes reliable stock rules, traceable sales, and the preservation of transaction values over time.
 
-Sin una estructura de datos coherente para estos conceptos, sería difícil mantener relaciones entre los productos vendidos, las cantidades registradas y los valores históricos de cada operación.
+This vision is derived from the entities, invariants, and reporting capabilities documented in [`spec/data-model.md`](../spec/data-model.md). It does not imply that a particular user interface or deployment architecture has been confirmed.
 
-El modelo proporciona una estructura para registrar ventas y conservar información histórica de los productos involucrados.
+## 3. Problem statement
 
-**Trazabilidad:** entidades `category`, `product`, `sale`, `sale_item` y `user` en `spec/data-model.md`.
+A system that records products and sales must distinguish between the current catalog and the historical facts of a transaction.
 
-## 3. Visión del producto
+For example, changing a product's price after a sale must not automatically change the price recorded for that earlier sale. Likewise, stock must not become negative through a valid domain operation or in the persisted database.
 
-**Visión derivada:** disponer de un sistema que permita administrar un catálogo de productos, registrar sus ventas, mantener la consistencia de las existencias y conservar el detalle histórico de las operaciones realizadas por usuarios internos.
+The supplied model addresses these concerns by representing products, sales, and sale lines separately; preserving historical values on sale lines; calculating subtotals and totals; and enforcing a database constraint against negative stock.
 
-Esta visión resume las capacidades respaldadas por el modelo de datos. No representa una declaración de visión original confirmada por el propietario del producto.
+**Source references:** `spec/data-model.md`, §2.2–§2.4 and the physical model in §3.
 
-## 4. Objetivos del producto
+## 4. Product objectives
 
-Los siguientes objetivos se derivan del modelo:
+The documented product model supports the following objectives:
 
-1. Mantener un catálogo de productos clasificados por categorías.
-2. Registrar y consultar información de precios y existencias.
-3. Conservar el detalle de los productos y cantidades incluidos en cada venta.
-4. Preservar los valores históricos relevantes de una operación.
-5. Identificar al usuario interno asociado con una venta.
-6. Calcular subtotales y totales a partir de las líneas registradas.
-7. Evitar que las existencias persistidas sean negativas.
-8. Retirar productos del catálogo sin eliminarlos físicamente.
+1. Represent products with a name, positive price, stock quantity, category, and optional image key.
+2. Associate products with the predefined categories.
+3. Prevent negative stock from being persisted.
+4. Represent sales and their individual product lines.
+5. Preserve the relevant product values at the time of a sale.
+6. Calculate sale-line subtotals and sale totals from their underlying values.
+7. Represent internal users and the roles `admin` and `seller`.
+8. Support the product-oriented aggregated reporting described by the source.
+9. Retire products logically instead of physically deleting their records.
 
-Estos objetivos no implican que exista una interfaz específica ni que todas las operaciones estén expuestas mediante pantallas o API.
+These are objectives derived from the data model, not a claim that every interaction or user-facing workflow has been specified.
 
-## 5. Usuarios identificados
+## 5. Intended users
 
-### 5.1. Admin
+The model defines two internal role values:
 
-Rol interno identificado por el valor `admin`.
+- `admin`
+- `seller`
 
-La fuente también describe la creación inicial de un usuario administrador al iniciar la aplicación, mediante credenciales obtenidas del entorno.
+The detailed permissions and user journeys for each role are not fully established by the supplied data model. They must be specified only when additional evidence is available.
 
-Los permisos detallados del rol deben confirmarse en la implementación; no se deben inventar.
+The model does not define customers as a separate entity. Customer account management must therefore not be included as a confirmed product capability.
 
-### 5.2. Seller
+**Source reference:** `spec/data-model.md`, §1 and §2.5.
 
-Rol interno identificado por el valor `seller`.
+## 6. Product scope
 
-El modelo permite asociar una venta con un usuario mediante `sold_by_user_id`, aunque la clave foránea correspondiente aparece como pendiente en la fuente.
+### 6.1 Included
 
-No se puede afirmar que el sistema tenga clientes compradores registrados porque el modelo no contiene una entidad de cliente.
+The documented scope includes:
 
-## 6. Alcance del producto
+- Product catalog representation.
+- Product classification through predefined categories.
+- Stock-related domain rules.
+- Sale and sale-line representation.
+- Historical sale-line values.
+- Calculated subtotals and totals.
+- Internal user roles and password hashes.
+- Product-oriented aggregated reports.
+- Logical product retirement.
+- PostgreSQL persistence.
 
-### 6.1. Incluido en el alcance derivado
+### 6.2 Excluded or unconfirmed
 
-- Clasificación de productos por categorías.
-- Datos de productos, precios, existencias e imagen opcional.
-- Registro de ventas y líneas de detalle.
-- Conservación de valores históricos de los productos vendidos.
-- Cálculo de subtotales y totales.
-- Identificación del usuario asociado con una venta.
-- Retiro lógico de productos.
-- Consulta agregada de información de productos para reportes.
+The following are not confirmed by the source:
 
-### 6.2. No confirmado o fuera del alcance documentado
+- Customer management.
+- Product descriptions, SKUs, and reference codes.
+- Category CRUD operations.
+- Reports grouped by seller.
+- Multiple currencies.
+- A specific frontend or graphical interface.
+- REST endpoints or an API contract.
+- Microservices, message brokers, or a distributed architecture.
+- Specific availability, performance, or response-time targets.
 
-No se debe presentar como funcionalidad existente:
+These items must not be added to the confirmed scope without supporting requirements.
 
-- Gestión de clientes.
-- Gestión de proveedores.
-- Órdenes de compra.
-- Gestión de categorías mediante CRUD.
-- Reportes con desglose por vendedor.
-- Soporte para varias monedas.
-- Edición o eliminación de ventas registradas.
-- Auditoría mediante `created_at` y `updated_at`.
-- Funcionalidades específicas de interfaz que no estén descritas en la fuente.
+## 7. Product constraints
 
-## 7. Restricciones del producto
+### Data integrity
 
-- La base de datos utiliza PostgreSQL.
-- El esquema de persistencia es `sales`.
-- Existen cinco categorías iniciales definidas por la fuente.
-- El stock no puede ser negativo según una restricción física existente.
-- La venta debe tener al menos una línea para poder confirmarse, según la validación del dominio.
-- Los importes históricos se conservan en las líneas de venta.
-- Los subtotales y totales son valores calculados.
-- Los productos se retiran mediante eliminación lógica.
-- El modelo utiliza una única moneda, sin campos de moneda.
-- Las marcas de tiempo se almacenan con `timestamptz` y se usa UTC.
+The database enforces non-negative product stock through `ck_product_stock_non_negative`.
 
-## 8. Criterios de éxito derivados
+Positive product price and positive sale-line quantity are documented domain rules, but the physical enforcement status must be checked against the source's pending tasks and constraints.
 
-Los siguientes criterios son verificables a partir del modelo y sirven como guía para evaluar la coherencia documental:
+### Historical accuracy
 
-- Los productos se relacionan con una categoría.
-- La persistencia impide almacenar stock negativo.
-- Una venta no es confirmable sin líneas.
-- Las líneas conservan sus valores históricos aunque cambie el catálogo.
-- El subtotal y el total se obtienen mediante cálculos.
-- Un producto retirado puede conservar su registro mediante eliminación lógica.
+Sale lines retain relevant values from the transaction. These historical values are distinct from the current product catalog.
 
-La fuente no proporciona métricas cuantitativas de rendimiento, adopción o satisfacción; no se establecen metas numéricas inventadas.
+### Calculated amounts
 
-## 9. Riesgos y decisiones pendientes
+Line subtotals and sale totals are calculated and are not stored as separate persisted columns.
 
-### 9.1. Restricciones de integridad
+### User credentials
 
-El estado de las restricciones para precio y cantidad presenta información que debe verificarse dentro de `spec/data-model.md`.
+The domain works with password hashes rather than plaintext passwords.
 
-### 9.2. Asociación con el usuario
+### Product retirement
 
-La FK de `sale.sold_by_user_id` está identificada como pendiente. No debe darse por completada.
+Products use logical deletion through `deleted_at`. This must not be described as ordinary physical deletion.
 
-### 9.3. Reportes por categoría
+### Reporting
 
-La agrupación por nombre histórico de categoría puede producir filas separadas cuando una categoría cambia de nombre. La fuente señala una decisión pendiente respecto de la especificación del reporte.
+The source describes aggregated product reporting. It does not establish seller-based report grouping.
 
-### 9.4. Alcance no descrito
+**Source references:** `spec/data-model.md`, §2–§5 and the reporting sections.
 
-No se deben agregar capacidades de negocio que no estén respaldadas por el modelo.
+## 8. Product success criteria
 
-## 10. Fuente de referencia
+The following criteria can be checked against the supplied specification:
 
-`spec/data-model.md`, definiciones de entidades, reglas de negocio, relaciones, reportes y tareas pendientes.
+- Product information matches the defined fields.
+- Product stock cannot be persisted below zero.
+- Domain-only rules are not misrepresented as database constraints.
+- Sale lines preserve historical values.
+- Subtotals and totals are calculated rather than stored.
+- The documented role values match the source.
+- Product retirement is represented by `deleted_at`.
+- Reports are described without unsupported grouping dimensions.
+- Pending relationships and constraints remain explicitly identified.
+
+These are documentation and model-consistency criteria. The source does not provide business KPIs or numerical targets for product success.
+
+## 9. Assumptions and unresolved decisions
+
+The supplied data model does not fully define the user interface, detailed role permissions, deployment topology, or all reporting decisions.
+
+No numerical performance, availability, or adoption target is introduced because none is supported by the source.
+
+The final implementation status of pending constraints and foreign keys must follow the source rather than an assumed future state.
+
+## 10. Traceability
+
+This product definition is derived from `spec/data-model.md`, including its glossary, entity invariants, physical schema, foreign-key policy, reporting behavior, and pending-task information.
+
+If a product statement cannot be supported by the supplied model, it must be removed or explicitly marked as an assumption.
