@@ -1,110 +1,119 @@
-# 01 — Context
+# 01 — System Context
 
-## 1. Propósito
+## 1. Purpose
 
-Este documento presenta el contexto general del sistema de gestión de productos, inventario y ventas descrito en `spec/data-model.md`.
+This document defines the system boundary and general context of **Simple Stock Flow**, based on [`spec/data-model.md`](../spec/data-model.md).
 
-Su objetivo es establecer qué información administra el sistema, cuáles son sus límites y qué actores se pueden identificar a partir de la fuente.
+The objective is to explain what the system represents, which responsibilities are supported by the available specification, and which capabilities cannot be confirmed from the source.
 
-## 2. Descripción general
+## 2. System overview
 
-El sistema permite organizar productos mediante categorías, mantener información de precios y existencias, registrar ventas y conservar el detalle de los productos vendidos.
+Simple Stock Flow is a system for maintaining a product catalog, controlling stock, recording sales, and obtaining aggregated sales information.
 
-También contempla usuarios internos con roles de administración y venta.
+The supplied model identifies five principal entities:
 
-El modelo de datos se encuentra en el esquema `sales` de PostgreSQL y contiene cinco entidades principales:
+- `Category`: classifies products.
+- `Product`: represents catalog items, including price and available stock.
+- `Sale`: represents a recorded sale.
+- `SaleItem`: represents an individual product line within a sale.
+- `User`: represents an internal operator who can be associated with a sale.
 
-- `category`
-- `product`
-- `sale`
-- `sale_item`
-- `user`
+The persistence layer uses PostgreSQL, with the tables located in the `sales` schema.
 
-**Fuente:** `spec/data-model.md`, definición de entidades y relaciones.
+**Source references:** `spec/data-model.md`, §1–§3 and the entity definitions in §2.
 
-## 3. Contexto de uso
+## 3. Business problem
 
-A partir del modelo se identifican dos roles internos:
+The data model supports the consistent representation of products, stock quantities, and sales transactions.
 
-- **Admin:** usuario con rol administrativo.
-- **Seller:** usuario con rol de vendedor u operador de ventas.
+It also preserves historical information for sale lines. A line records the relevant product values at the time of the sale, so later catalog changes do not automatically rewrite those historical values.
 
-La fuente no permite afirmar cuáles son todas las pantallas, permisos detallados o procesos de autenticación disponibles en la interfaz.
+The model distinguishes between stored information and calculated information. Line subtotals and sale totals are calculated from their constituent values rather than stored as separate database columns.
 
-No se identifica una entidad de cliente o comprador. Por tanto, no se debe asumir que el sistema mantiene perfiles, direcciones o historiales individuales de clientes.
+**Source references:** the `Product`, `Sale`, and `SaleItem` definitions in `spec/data-model.md`, §2, and the physical model in §3.
 
-## 4. Alcance funcional identificado
+## 4. System boundary
 
-El modelo de datos respalda las siguientes capacidades:
+### 4.1 Included responsibilities
 
-1. Organizar productos por categorías.
-2. Mantener información de productos, precios y existencias.
-3. Registrar una venta y asociarla con el usuario que la realiza, de acuerdo con el campo `sold_by_user_id`.
-4. Registrar las líneas de una venta, indicando productos y cantidades.
-5. Conservar el nombre, precio y categoría del producto tal como estaban representados en la línea de venta.
-6. Calcular subtotales y totales sin almacenarlos como campos persistidos.
-7. Consultar información agregada para reportes de productos.
-8. Retirar productos del catálogo mediante eliminación lógica.
-9. Distinguir usuarios internos por los roles `admin` y `seller`.
+The documented system includes:
 
-El alcance anterior describe capacidades derivadas del modelo, no una confirmación de que exista una interfaz completa para todas ellas.
+- Product catalog information.
+- Product-to-category relationships.
+- Stock withdrawal and restocking rules described by the domain.
+- Sale and sale-line representation.
+- Historical product values within sale lines.
+- Internal users and the roles `admin` and `seller`.
+- Product-oriented aggregated reporting as described by the source.
+- Logical product retirement through `deleted_at`.
+- PostgreSQL persistence and the constraints explicitly documented in the model.
 
-## 5. Fuera del alcance confirmado
+These statements describe the responsibilities supported by the data model. They do not imply that every user interface, endpoint, or deployment component has been specified.
 
-No existe evidencia suficiente en el modelo para afirmar que el sistema incluye:
+### 4.2 Excluded or unconfirmed capabilities
 
-- Gestión de clientes.
-- Registro de datos personales de compradores.
-- Gestión de proveedores.
-- Órdenes de compra o reposición de inventario.
-- Múltiples monedas.
-- Desglose de reportes por vendedor.
-- Auditoría mediante campos `created_at` y `updated_at`.
-- Edición o eliminación de ventas ya registradas.
-- Eliminación física de productos como operación habitual del catálogo.
+The source does not establish the following as confirmed system capabilities:
 
-Estos puntos no deben documentarse como funcionalidades existentes sin una fuente adicional.
+- Customer or buyer management.
+- Product descriptions, SKUs, or reference codes.
+- Category creation, editing, or deletion through a management interface.
+- Sales reports grouped by seller.
+- Multiple currencies.
+- Physical deletion of products through the normal domain model.
+- HTTP APIs, a graphical interface, or a microservice architecture.
+- A message broker or event-driven infrastructure.
 
-## 6. Límites del sistema
+These capabilities must not be documented as implemented features without additional evidence.
 
-### 6.1. Persistencia
+## 5. Users and roles
 
-PostgreSQL almacena las categorías, productos, ventas, líneas de venta y usuarios.
+The model defines internal users with two role values: `admin` and `seller`.
 
-### 6.2. Reglas de negocio
+The detailed permission matrix for each role is not fully established by the supplied data model. Therefore, this document does not assign specific permissions to either role beyond what can be directly verified in the source.
 
-Algunas reglas se encuentran implementadas mediante restricciones de base de datos, mientras que otras se validan únicamente en el dominio.
+The system does not define a separate customer entity.
 
-La documentación debe distinguir ambos casos.
+**Source reference:** `spec/data-model.md`, §1 and the `User` definition in §2.5.
 
-### 6.3. Información histórica
+## 6. External dependencies and technical context
 
-Las líneas de venta conservan valores históricos del producto. Por ello, un cambio posterior en el catálogo no debe reescribir automáticamente la información registrada en ventas anteriores.
+The confirmed persistence technology is PostgreSQL. The source identifies PostgreSQL 16.14, the database `simple_stock_flow`, the `sales` schema, and UTC as the server time reference.
 
-### 6.4. Credenciales
+The product image is represented by an opaque `image_key`; the model does not store image binary content in that column.
 
-La información de usuarios contempla `password_hash`. El modelo no justifica almacenar ni procesar contraseñas en texto plano dentro del dominio.
+The source also describes initialization of an initial administrator using credentials supplied through the environment. The exact deployment process must not be expanded beyond what the source confirms.
 
-## 7. Restricciones y consideraciones
+**Source references:** `spec/data-model.md`, §0, §2.2, and the physical model and initialization sections.
 
-- El sistema utiliza PostgreSQL.
-- Las marcas de tiempo se almacenan con tipo `timestamptz` y el servidor utiliza UTC.
-- El modelo es monomoneda: no contiene campos para moneda.
-- Las categorías iniciales corresponden a cinco registros definidos en la fuente.
-- Los productos se retiran mediante eliminación lógica con `deleted_at`.
-- La fuente indica que el usuario administrador inicial se crea al iniciar la aplicación mediante credenciales provenientes del entorno, no mediante una inserción SQL de inicialización.
+## 7. Important system constraints
 
-## 8. Incertidumbres identificadas
+- Persisted product stock must not be negative; the database constraint is `ck_product_stock_non_negative`.
+- A sale must contain at least one line to be confirmable, according to `Sale.EnsureConfirmable`.
+- A sale is treated as immutable by the documented domain model.
+- A product is retired logically using `deleted_at`.
+- Historical sale-line values must be distinguished from current catalog values.
+- Domain rules and database constraints must be documented separately.
+- Relationships or constraints marked as pending must remain identified as pending.
 
-Hay decisiones y tareas pendientes que no deben presentarse como resueltas sin confirmación:
+**Source references:** `spec/data-model.md`, §2.2–§2.5, §3, §5, and the relevant task entries.
 
-- El estado de algunas restricciones de integridad, especialmente las relacionadas con el precio y la cantidad.
-- La clave foránea de `sale.sold_by_user_id` hacia `user`, identificada como pendiente en la fuente.
-- La política definitiva para agrupar reportes por el nombre histórico de categoría cuando una categoría se renombra.
-- Cualquier funcionalidad de interfaz o permiso no descrito por el modelo.
+## 8. Assumptions and open questions
 
-Las discrepancias deben contrastarse con las secciones pertinentes de `spec/data-model.md` antes de cerrar la documentación.
+The data model does not provide enough evidence to confirm a complete user-interface design, deployment topology, API contract, or detailed role-permission matrix.
 
-## 9. Fuente de referencia
+Those matters are outside the confirmed scope of this reconstruction. They must remain unspecified or be explicitly labeled as assumptions if a later document needs to discuss them.
 
-La descripción de este contexto se deriva de `spec/data-model.md`, particularmente de las definiciones de entidades, relaciones, reglas de negocio, configuración y tareas pendientes.
+The physical enforcement status of positive product price, positive sale-line quantity, and the foreign key from `sale` to `user` must be represented according to the source's current status and pending-task notes.
+
+## 9. Traceability
+
+This context document is derived from:
+
+- `spec/data-model.md`, §0: schema and technical conventions.
+- `spec/data-model.md`, §1: domain glossary.
+- `spec/data-model.md`, §2: entity definitions and invariants.
+- `spec/data-model.md`, §3: physical database model.
+- `spec/data-model.md`, §5: foreign-key policy.
+- The relevant reporting, initialization, and pending-task sections of the same source.
+
+The supplied data model is the authority for resolving any inconsistency between this document and the source.
