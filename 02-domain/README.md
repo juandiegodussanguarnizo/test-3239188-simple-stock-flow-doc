@@ -156,3 +156,37 @@ A partir de las reglas documentadas, el proceso de negocio puede resumirse así:
 
 Este resumen representa las reglas descritas, no una especificación completa de transacciones, concurrencia o recuperación ante fallos. Esos detalles deben documentarse solo si la fuente los confirma.
 
+## 7. Invariantes y consistencia
+
+Las siguientes condiciones deben mantenerse:
+
+- El stock persistido no puede ser negativo.
+- Una venta confirmable debe contener líneas.
+- La cantidad de cada línea debe ser positiva según la regla de dominio.
+- El precio y los demás valores históricos conservados no deben cambiar simplemente porque se actualice el catálogo.
+- El total debe derivarse de las líneas y no depender de un total persistido que la fuente no contempla.
+- Una venta registrada no debe tratarse como una entidad editable si se mantiene la inmutabilidad definida.
+
+## 8. Eventos del dominio
+
+La fuente describe entidades y operaciones, pero no permite confirmar un catálogo formal de eventos de dominio ni un mecanismo de publicación de eventos.
+
+Por tanto, no se declara la existencia de eventos como `SaleConfirmed` o `StockReduced` como eventos implementados.
+
+Como posibles conceptos para una futura modelación, podrían evaluarse eventos relacionados con la confirmación de una venta y la modificación de existencias, pero su implementación debe marcarse como propuesta y no como hecho existente.
+
+## 9. Incertidumbres del dominio
+
+Antes de cerrar el documento, deben revisarse:
+
+- El estado actual de la restricción física para precio positivo.
+- El estado actual de la restricción física para cantidad positiva.
+- La FK de `sale.sold_by_user_id` hacia `user`.
+- La decisión sobre reportes que agrupan por categoría histórica cuando la categoría cambia de nombre.
+
+Estas cuestiones deben permanecer explícitas hasta que la fuente o el responsable del sistema las resuelva.
+
+## 10. Fuente de referencia
+
+Este documento deriva de las definiciones de entidades, relaciones, reglas de dominio y tareas pendientes descritas en `spec/data-model.md`.
+
