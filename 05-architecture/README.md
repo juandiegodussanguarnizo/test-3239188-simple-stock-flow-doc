@@ -63,7 +63,101 @@ La fuente indica que la clave foránea de producto para las líneas se incorpora
 ` sale.sold_by_user_id` identifica al usuario asociado con la venta.
 
 La clave foránea hacia `user` aparece como pendiente en la fuente. La documentación debe distinguir la existencia del campo de la existencia efectiva de la restricción física.
+## 5. Reglas de persistencia
 
+### 5.1. Stock
 
+Existe una restricción `CHECK` identificada como `ck_product_stock_non_negative`, que impide almacenar stock negativo.
 
+Esta regla está implementada en PostgreSQL.
+
+### 5.2. Precio
+
+El precio positivo se describe como regla del dominio. La fuente contiene información contradictoria sobre el estado de la restricción física correspondiente.
+
+No debe afirmarse que existe un `CHECK` para precio positivo sin comprobar el apartado físico y las tareas relacionadas.
+
+### 5.3. Cantidad
+
+La cantidad de una línea debe ser mayor que cero según la regla de dominio. El estado de la restricción física correspondiente debe verificarse en la fuente.
+
+### 5.4. Valores calculados
+
+Los subtotales de las líneas y el total de la venta se calculan a partir de los datos correspondientes.
+
+No se deben documentar como columnas persistidas del modelo.
+
+## 6. Dominio y responsabilidades
+
+### 6.1. Product
+
+Representa el producto y sus datos de catálogo.
+
+Su responsabilidad incluye mantener la información relevante del producto y respetar las reglas descritas para el precio y el stock.
+
+### 6.2. Sale
+
+Representa la venta y controla la regla de confirmación documentada mediante `EnsureConfirmable`.
+
+Una venta debe contener al menos una línea para ser confirmable.
+
+La fuente describe la venta como inmutable y no presenta puertos para editarla o eliminarla.
+
+### 6.3. SaleItem
+
+Representa cada línea de una venta.
+
+Conserva los valores históricos relevantes del producto y la cantidad vendida. El subtotal se deriva de la cantidad y del precio unitario histórico.
+
+### 6.4. Category
+
+Representa las categorías iniciales del catálogo. No debe suponerse una funcionalidad de administración CRUD de categorías si no está descrita en la fuente.
+
+### 6.5. User
+
+Representa usuarios internos y los roles `admin` y `seller`.
+
+El dominio trabaja con `password_hash`, no con contraseñas en texto plano.
+
+## 7. Operaciones y flujo de venta
+
+La operación descrita de `Sale.AddItem` retira stock antes de añadir la línea a la venta.
+
+El flujo conceptual de una venta es:
+
+1. Identificar el producto y la cantidad.
+2. Aplicar las validaciones correspondientes.
+3. Retirar el stock según el comportamiento documentado.
+4. Crear la línea conservando los valores históricos del producto.
+5. Verificar que la venta tenga al menos una línea antes de confirmarla.
+6. Calcular los subtotales y el total a partir de las líneas.
+
+Este flujo resume el comportamiento del dominio. La fuente no permite especificar todos los detalles de transacciones, concurrencia, reversión de operaciones o tratamiento de fallos. Esos detalles deben confirmarse antes de documentarlos como decisiones de arquitectura.
+
+## 8. Puertos y adaptadores
+
+La evaluación solicita reconstruir la arquitectura a partir de la fuente. En consecuencia, esta sección diferencia las responsabilidades inferibles de las interfaces concretas.
+
+### 8.1. Responsabilidades identificadas
+
+- El dominio contiene reglas de entidades como `Sale` y `SaleItem`.
+- PostgreSQL conserva las entidades y relaciones descritas.
+- Las consultas agregadas permiten obtener información para reportes.
+- Las reglas físicas y las reglas del dominio no son equivalentes.
+
+### 8.2. Interfaces no confirmadas
+
+No se declaran nombres concretos de repositorios, controladores, servicios de aplicación o adaptadores cuando no pueden verificarse en `spec/data-model.md`.
+
+Si la fuente define puertos o interfaces explícitas en otra sección, deben documentarse con sus nombres y responsabilidades exactas, sin reemplazarlos por interfaces inventadas.
+
+## 9. Reportes y consultas
+
+El modelo contempla información agregada para reportes de productos.
+
+Los resultados agregados se calculan en la base de datos y no se persisten como entidades independientes.
+
+La fuente no contempla un desglose por vendedor.
+
+Existe una decisión pendiente sobre la agrupación por categoría histórica: si el nombre de una categoría cambia, el reporte puede generar filas diferentes para nombres históricos distintos. Esta decisión debe contrastarse con la especificación de reporte señalada en el modelo y confirmarse con el responsable del sistema.
 
