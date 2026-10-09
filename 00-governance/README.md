@@ -31,3 +31,6 @@ Estructura documental
 04-requirements: requisitos funcionales y no funcionales.
 
 05-architecture: arquitectura, componentes y decisiones técnicas.
+Restricción
+
+Conservar spec/data-model.md como fuente de referencia sin reemplazarlo por documentos derivados.
