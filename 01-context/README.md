@@ -94,4 +94,17 @@ La información de usuarios contempla `password_hash`. El modelo no justifica al
 - Los productos se retiran mediante eliminación lógica con `deleted_at`.
 - La fuente indica que el usuario administrador inicial se crea al iniciar la aplicación mediante credenciales provenientes del entorno, no mediante una inserción SQL de inicialización.
 
+## 8. Incertidumbres identificadas
 
+Hay decisiones y tareas pendientes que no deben presentarse como resueltas sin confirmación:
+
+- El estado de algunas restricciones de integridad, especialmente las relacionadas con el precio y la cantidad.
+- La clave foránea de `sale.sold_by_user_id` hacia `user`, identificada como pendiente en la fuente.
+- La política definitiva para agrupar reportes por el nombre histórico de categoría cuando una categoría se renombra.
+- Cualquier funcionalidad de interfaz o permiso no descrito por el modelo.
+
+Las discrepancias deben contrastarse con las secciones pertinentes de `spec/data-model.md` antes de cerrar la documentación.
+
+## 9. Fuente de referencia
+
+La descripción de este contexto se deriva de `spec/data-model.md`, particularmente de las definiciones de entidades, relaciones, reglas de negocio, configuración y tareas pendientes.
