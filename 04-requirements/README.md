@@ -211,4 +211,44 @@ No se establecen objetivos de disponibilidad, tiempos de respuesta, capacidad co
 | Cantidad positiva | La regla de dominio existe; la restricción física requiere confirmación. | No afirmar que existe un `CHECK` sin evidencia. |
 | FK del usuario en la venta | `sale.sold_by_user_id` aparece como pendiente. | Marcar la relación física como pendiente. |
 | Reporte por categoría | Hay una decisión pendiente sobre nombres históricos y renombrados. | Registrar la discrepancia y no resolverla por suposición. |
+## 6. Matriz de trazabilidad
+
+| Requisito | Elemento de referencia |
+|---|---|
+| RF-01 | `product.category_id`, `category` |
+| RF-02 | Entidad `product` |
+| RF-03 | `ck_product_stock_non_negative` |
+| RF-04 | Regla de precio en el dominio y tareas relacionadas |
+| RF-05 | Entidad `sale`, `sold_by_user_id` |
+| RF-06 | Entidad `sale_item` y sus relaciones |
+| RF-07 | Regla de cantidad de `SaleItem` |
+| RF-08 | `Sale.EnsureConfirmable` |
+| RF-09 | Precio histórico de `sale_item` |
+| RF-10 | Nombre y categoría históricos de `sale_item` |
+| RF-11 | Cálculo del subtotal |
+| RF-12 | Cálculo del total |
+| RF-13 | Inmutabilidad de `Sale` |
+| RF-14 | `product.deleted_at` |
+| RF-15 | Roles de `user` |
+| RF-16 | `user.password_hash` |
+| RF-17 | Sección de reportes |
+| RF-18 | Sección de inicialización del usuario administrador |
+| RNF-01 | Modelo físico PostgreSQL |
+| RNF-02 | Restricción de stock |
+| RNF-03 | Valores históricos de `sale_item` |
+| RNF-04 | Reglas de credenciales |
+| RNF-05 | `timestamptz` y UTC |
+| RNF-06 | Modelo monomoneda |
+| RNF-07 | Eliminación lógica |
+| RNF-08 | Criterios de gobierno documental |
+
+Los identificadores RF y RNF son propios de esta reconstrucción y deben ajustarse si la fuente de evaluación exige una nomenclatura distinta.
+
+## 7. Criterios de aceptación documental
+
+- Cada requisito describe una capacidad o restricción concreta.
+- Los requisitos distinguen entre comportamiento del dominio y restricciones físicas.
+- Las tareas pendientes no se describen como terminadas.
+- No se inventan métricas no presentes en la fuente.
+- Los requisitos mantienen trazabilidad con el modelo de datos.
 
