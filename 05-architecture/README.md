@@ -38,5 +38,32 @@ Esta separación es una representación conceptual para documentar el modelo. La
 | `sale_item` | Registrar productos, cantidades y valores históricos de una venta. |
 | `user` | Representar usuarios internos y sus roles. |
 
+## 4. Relaciones de persistencia
+
+### 4.1. Producto y categoría
+
+`product.category_id` referencia la categoría asociada al producto.
+
+La fuente identifica una política `RESTRICT` para esta relación, por lo que no debe describirse como una relación que permita eliminar una categoría referenciada sin restricciones.
+
+### 4.2. Venta y líneas
+
+` sale_item.sale_id` referencia `sale`.
+
+La fuente describe una relación con comportamiento `CASCADE` para esta clave foránea. Su alcance es la relación física entre venta y líneas, y no debe interpretarse como autorización para editar o eliminar ventas desde el dominio.
+
+### 4.3. Línea y producto
+
+` sale_item` referencia al producto correspondiente.
+
+La fuente indica que la clave foránea de producto para las líneas se incorpora mediante la tarea T-20. Se debe comprobar el estado final de esa tarea y la sección del modelo físico antes de afirmar su estado actual sin reservas.
+
+### 4.4. Venta y usuario
+
+` sale.sold_by_user_id` identifica al usuario asociado con la venta.
+
+La clave foránea hacia `user` aparece como pendiente en la fuente. La documentación debe distinguir la existencia del campo de la existencia efectiva de la restricción física.
+
+
 
 
